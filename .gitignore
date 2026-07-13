@@ -1,0 +1,33 @@
+# Output data (large binary files)
+output/
+output_trained/
+output_test_only/
+output_rala/
+output_rala_full/
+output_arrhythmia/
+models/
+
+# Downloaded datasets
+data/*.dat
+data/*.hea
+data/*.atr
+data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
