@@ -82,7 +82,7 @@ def parse_aecg(filepath):
     with open(filepath, 'rb') as f: raw = f.read()
     content = raw.decode('utf-8', errors='replace')
     r = {'fs': 1000.0, 'signals': {}}
-    m = re.search(rb'<increment[^>]*value="([^"]+)"[^>]*unit="s"', raw)
+    m = re.search('<increment[^>]*value="([^"]+)"[^>]*unit="s"'.encode(), raw)
     if m: r['fs'] = 1.0 / float(m.group(1))
     ss = content.find('<sequenceSet'); se = content.find('</sequenceSet>', ss)
     digits = re.findall(r'<digits[^>]*>([^<]+)</digits>', content[ss:se])
@@ -90,13 +90,14 @@ def parse_aecg(filepath):
         if i < len(digits):
             r['signals'][name] = np.array([float(x) for x in digits[i].split()], dtype=np.float64)
     for key, pat in {
-        'HR': b'HEART_RATE.*?value="([^"]+)"[^>]*unit="bpm"',
-        'QRS_dur': b'TIME_PD_QRS\b(?!c).*?value="([^"]+)"[^>]*unit="ms"',
-        'QRS_axis': b'ANGLE_QRS_FRONT.*?value="([^"]+)"',
-        'P_axis': rb'ANGLE_P_FRONT.*?value="([^"]+)"[^>]*unit="deg"',
+        'HR': 'HEART_RATE.*?value="([^"]+)"',
+        'QRS_dur': 'TIME_PD_QRS\b(?!c).*?value="([^"]+)"',
+        'QRS_axis': 'ANGLE_QRS_FRONT.*?value="([^"]+)"',
+        'P_axis':   'ANGLE_P_FRONT.*?value="([^"]+)"',
     }.items():
-        m = re.search(pat, raw); r[key] = float(m.group(1)) if m else None
-    interp = re.search(rb'INTERPRETATION_STATEMENT.*?xsi:type="ST"[^>]*>([^<]+)</value>', raw, re.DOTALL)
+        m = re.search(pat.encode(), raw, re.DOTALL)
+        r[key] = float(m.group(1)) if m else None
+    interp = re.search('INTERPRETATION_STATEMENT.*?xsi:type="ST"[^>]*>([^<]+)</value>'.encode(), raw, re.DOTALL)
     r['interpretation'] = interp.group(1).decode('utf-8',errors='replace').strip().replace('\n','; ') if interp else ''
     return r
 
