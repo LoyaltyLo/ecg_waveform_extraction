@@ -57,8 +57,11 @@ class GaussianMixtureModel:
         n = X.shape[0]
         idx = self._rng.choice(n, self.n_components, replace=False)
         self.means = X[idx].copy()
-        self.covars = np.full((self.n_components, self.n_features),
-                               np.var(X, axis=0) / self.n_components)
+        self.covars = np.maximum(
+            np.full((self.n_components, self.n_features),
+                    np.var(X, axis=0) / self.n_components),
+            1e-6,
+        )
         self.weights = np.ones(self.n_components) / self.n_components
 
     # ------------------------------------------------------------------
@@ -174,9 +177,10 @@ class GaussianMixtureModel:
             resp = self._e_step(X)                          # (N, K)
 
             if sample_weight is not None:
+                # Weighted EM: scale responsibilities by sample weight and
+                # let the M-step consume the weighted counts directly.
+                # Do NOT re-normalize rows — that would cancel the weights.
                 resp = resp * sample_weight[:, np.newaxis]
-                row_sum = resp.sum(axis=1, keepdims=True)
-                resp = np.where(row_sum > 1e-12, resp / row_sum, 1.0 / self.n_components)
 
             self._m_step(X, resp)
 

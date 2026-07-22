@@ -1,4 +1,4 @@
-"""Utility functions for visualization and data loading."""
+"""Utility functions for visualization, data loading, and dashboard generation."""
 
 from .vis import (
     plot_segmentation,
@@ -12,6 +12,8 @@ from .data_loader import (
     load_wfdb_record,
     generate_synthetic_ecg,
 )
+from .aecg_parser import parse_aecg, get_default_leads
+from .dashboard import build_dashboard
 
 __all__ = [
     "plot_segmentation",
@@ -22,4 +24,7 @@ __all__ = [
     "load_csv_ecg",
     "load_wfdb_record",
     "generate_synthetic_ecg",
+    "parse_aecg",
+    "get_default_leads",
+    "build_dashboard",
 ]

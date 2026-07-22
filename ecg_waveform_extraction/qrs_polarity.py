@@ -8,7 +8,8 @@ For each beat in Lead I and Lead II:
 """
 
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import os, json, re, time, gc
 from collections import Counter
@@ -22,9 +23,11 @@ from ecg_waveform_extraction.preprocessing import ECGPreprocessor
 from ecg_waveform_extraction.features import FeatureExtractor
 from ecg_waveform_extraction.hsmm import HSMMModel, smart_initialize_gmms
 from ecg_waveform_extraction.segmentation import ECGSegmenter
+from ecg_waveform_extraction.extraction.qrs_refiner import refine_qrs_boundaries, compute_qrs_metrics
+from ecg_waveform_extraction.utils.aecg_parser import parse_aecg
 
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output_rala_full/_qrs_polarity'
+OUT_DIR = str(Path(__file__).resolve().parent / 'output/rala_full/_qrs_polarity')
 os.makedirs(OUT_DIR, exist_ok=True)
 N_FILES = 50
 MAX_SAMPLES = 4000
@@ -43,32 +46,6 @@ class QRSBeat:
     lead_name: str
 
 
-# =====================================================================
-def parse_aecg(filepath):
-    with open(filepath, 'rb') as f: raw = f.read()
-    content = raw.decode('utf-8', errors='replace')
-    r = {'fs': 1000.0, 'signals': {}}
-    m = re.search(rb'<increment[^>]*value="([^"]+)"[^>]*unit="s"', raw)
-    if m: r['fs'] = 1.0 / float(m.group(1))
-    ss = content.find('<sequenceSet'); se = content.find('</sequenceSet>', ss)
-    digits = re.findall(r'<digits[^>]*>([^<]+)</digits>', content[ss:se])
-    for i, name in enumerate(['I','II','III','AVR','AVL','AVF']):
-        if i < len(digits):
-            r['signals'][name] = np.array([float(x) for x in digits[i].split()], dtype=np.float64)
-    for key, pat in {
-        'HR': 'HEART_RATE.*?value="([^"]+)"',
-        'QRS_dur': 'TIME_PD_QRS\b(?!c).*?value="([^"]+)"',
-        'QRS_axis': 'ANGLE_QRS_FRONT.*?value="([^"]+)"',
-        'P_axis': 'ANGLE_P_FRONT.*?value="([^"]+)"',
-    }.items():
-        m = re.search(pat.encode(), raw, re.DOTALL)
-        r[key] = float(m.group(1)) if m else None
-    interp = re.search(rb'INTERPRETATION_STATEMENT.*?xsi:type="ST"[^>]*>([^<]+)</value>', raw, re.DOTALL)
-    r['interpretation'] = (interp.group(1).decode('utf-8',errors='replace').strip().replace('\n','; ')
-                           if interp else '')
-    return r
-
-
 def run_hsmm(signal, fs):
     prep = ECGPreprocessor(fs=fs)
     clean = prep.preprocess(signal)
@@ -80,57 +57,6 @@ def run_hsmm(signal, fs):
     smart_initialize_gmms(model, features)
     seg = ECGSegmenter(preprocessor=prep, feature_extractor=fe, model=model, fs=fs)
     return seg.segment(signal), clean
-
-
-def refine_qrs_boundaries(ecg_clean, q_on_hsmm, r_peak_hsmm, s_off_hsmm, fs):
-    """Refine HSMM QRS boundaries using signal derivative.
-
-    1. R peak: max |amplitude| in ±20ms window
-    2. Q onset: walk RIGHT until |d1| exceeds 3σ noise floor
-    3. S offset (J-point): walk LEFT until |d1| returns to baseline
-    """
-    T = len(ecg_clean)
-    d1 = np.gradient(ecg_clean)
-
-    # Noise floor from quiet early segment
-    quiet_end = min(int(0.2 * fs), T // 5)
-    noise_sigma = float(np.std(d1[:quiet_end]) + 1e-6)
-    threshold = noise_sigma * 3.0
-
-    # Step 1: R peak refinement
-    r_search_start = max(0, r_peak_hsmm - int(0.02 * fs))
-    r_search_end = min(T - 1, r_peak_hsmm + int(0.02 * fs))
-    r_search = ecg_clean[r_search_start:r_search_end + 1]
-    bl_local = float(np.median(r_search))
-    r_peak = r_search_start + int(np.argmax(np.abs(r_search - bl_local)))
-
-    # Step 2: Q onset refinement (walk right from HSMM estimate)
-    q_on = q_on_hsmm
-    for i in range(q_on_hsmm, min(r_peak, q_on_hsmm + int(0.08 * fs))):
-        if abs(d1[i]) > threshold:
-            for j in range(i, max(q_on_hsmm, i - int(0.01 * fs)), -1):
-                if abs(d1[j]) <= threshold * 0.5:
-                    q_on = j; break
-            else: q_on = i
-            break
-
-    # Step 3: S offset (J-point) refinement (walk left from HSMM estimate)
-    s_off = s_off_hsmm
-    for i in range(s_off_hsmm, max(r_peak + int(0.02 * fs), s_off_hsmm - int(0.10 * fs)), -1):
-        if abs(d1[i]) > threshold:
-            for j in range(i, min(s_off_hsmm, i + int(0.02 * fs))):
-                if abs(d1[j]) <= threshold * 0.5:
-                    s_off = j; break
-            else: s_off = i
-            break
-
-    # Sanity minimum 20ms QRS
-    min_qrs = int(0.02 * fs)
-    if s_off - q_on < min_qrs: q_on, s_off = q_on_hsmm, s_off_hsmm
-    q_on = max(0, min(q_on, T - 1))
-    s_off = max(q_on + min_qrs, min(s_off, T - 1))
-    r_peak = max(q_on, min(r_peak, s_off))
-    return q_on, r_peak, s_off
 
 
 def extract_qrs(seg_result, ecg_clean, fs, lead_name):
@@ -319,11 +245,12 @@ def process_record(fname):
     II_bip = sum(1 for q in qrs_II if q.polarity == 'biphasic')
     n_beats = len(qrs_I)
 
+    meas = aecg.get('measurements', {})
     summary = {
         'record': rec_name,
         'n_beats': n_beats,
-        'P_axis': aecg.get('P_axis'), 'QRS_axis': aecg.get('QRS_axis'),
-        'HR': aecg.get('HR'), 'ann_QRS_dur_ms': aecg.get('QRS_dur'),
+        'P_axis': meas.get('P_axis'), 'QRS_axis': meas.get('QRS_axis'),
+        'HR': meas.get('HR'), 'ann_QRS_dur_ms': meas.get('QRS_dur'),
         'lead_I': {
             'n_positive': I_pos, 'n_negative': I_neg, 'n_biphasic': I_bip,
             'mean_rs_ratio': round(float(np.mean([q.rs_ratio for q in qrs_I])), 4) if qrs_I else 0,

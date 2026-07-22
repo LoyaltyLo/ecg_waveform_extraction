@@ -6,7 +6,8 @@ For each beat saves:
 """
 
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import os, json, re, time, gc
 import numpy as np
@@ -19,13 +20,13 @@ from ecg_waveform_extraction.preprocessing import ECGPreprocessor
 from ecg_waveform_extraction.features import FeatureExtractor
 from ecg_waveform_extraction.hsmm import HSMMModel, smart_initialize_gmms
 from ecg_waveform_extraction.segmentation import ECGSegmenter
-from ecg_waveform_extraction.extraction import PWaveExtractor
+from ecg_waveform_extraction.extraction import PWaveExtractor, refine_qrs_boundaries
 from ecg_waveform_extraction.hsmm.hsmm_model import STATE_LABELS
 from ecg_waveform_extraction.utils.vis import STATE_COLORS
-from ecg_waveform_extraction.qrs_polarity import refine_qrs_boundaries
+from ecg_waveform_extraction.utils.aecg_parser import parse_aecg
 
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output_rala_full/_p_qrs_t_wave'
+OUT_DIR = str(Path(__file__).resolve().parent / 'output/rala_full/_p_qrs_t_wave')
 os.makedirs(OUT_DIR, exist_ok=True)
 N_FILES = 50
 MAX_SAMPLES = 4000
@@ -33,34 +34,6 @@ MAX_BEATS_PER_RECORD = 6
 LEADS_TO_PROCESS = ['I', 'II']
 
 
-def parse_signal(filepath):
-    with open(filepath, 'rb') as f: raw = f.read()
-    content = raw.decode('utf-8', errors='replace')
-    fs = 1000.0
-    m = re.search(rb'<increment[^>]*value="([^"]+)"[^>]*unit="s"', raw)
-    if m: fs = 1.0 / float(m.group(1))
-    ss = content.find('<sequenceSet'); se = content.find('</sequenceSet>', ss)
-    digits = re.findall(r'<digits[^>]*>([^<]+)</digits>', content[ss:se])
-    lead_names = ['I', 'II', 'III', 'AVR', 'AVL', 'AVF']
-    signals = {}
-    for i, name in enumerate(lead_names):
-        if i < len(digits):
-            sig = np.array([float(x) for x in digits[i].split()], dtype=np.float64)
-            signals[name] = sig[:MAX_SAMPLES]
-    meas = {}
-    for key, pat in {
-        'HR': 'HEART_RATE.*?value="([^"]+)"',
-        'QRS_dur': 'TIME_PD_QRS\b(?!c).*?value="([^"]+)"',
-        'P_dur': 'TIME_PD_P\b(?!R).*?value="([^"]+)"',
-        'P_axis': 'ANGLE_P_FRONT.*?value="([^"]+)"',
-        'QRS_axis': 'ANGLE_QRS_FRONT.*?value="([^"]+)"',
-    }.items():
-        m = re.search(pat.encode(), raw, re.DOTALL)
-        meas[key] = float(m.group(1)) if m else None
-    interp = re.search(rb'INTERPRETATION_STATEMENT.*?xsi:type="ST"[^>]*>([^<]+)</value>', raw, re.DOTALL)
-    meas['interpretation'] = (interp.group(1).decode('utf-8',errors='replace').strip().replace('\n','; ')
-                              if interp else '')
-    return signals, fs, meas
 
 
 def process_one_lead(sig, fs, lead_name):
@@ -257,11 +230,15 @@ def save_lead_output(rec_name, rec_dir, lead_name, seg_result, clean, p_waves, f
 def process_record(fname):
     """Process one aECG file: extract Lead I + Lead II, generate separate outputs."""
     fpath = os.path.join(AECG_DIR, fname)
-    rec_name = fname.replace('.aECG', '')
+    aecg = parse_aecg(fpath, max_samples=MAX_SAMPLES)
+    rec_name = aecg['filename']
     rec_dir = os.path.join(OUT_DIR, rec_name)
     os.makedirs(rec_dir, exist_ok=True)
 
-    signals, fs, meas = parse_signal(fpath)
+    signals = aecg['signals']
+    fs = aecg['fs']
+    meas = aecg['measurements']
+    meas['interpretation'] = aecg['interpretation']
 
     results = {}
     for lead_name in LEADS_TO_PROCESS:

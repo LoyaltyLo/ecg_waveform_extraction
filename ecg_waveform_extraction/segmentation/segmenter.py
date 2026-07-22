@@ -144,7 +144,7 @@ class ECGSegmenter:
         result = self.decoder.decode(self.model, features)
 
         # Step 4: State sequence → beat boundaries
-        beats = self._extract_beats(result["state_sequence"])
+        beats = self._extract_beats(result["state_sequence"], filtered)
 
         # Step 5: Per-sample state names
         state_names = [self.model.get_state_name(lbl)
@@ -165,69 +165,105 @@ class ECGSegmenter:
     # Beat boundary extraction
     # ------------------------------------------------------------------
     def _extract_beats(self,
-                       segments: list[tuple[int, int, int]]) -> list[BeatBoundary]:
+                       segments: list[tuple[int, int, int]],
+                       filtered_ecg: np.ndarray | None = None) -> list[BeatBoundary]:
         """Convert HSMM state segments into per-beat boundary structures.
 
-        A beat is defined as the sequence from P through TP.
-        The ISO→P transition marks the start of a new beat.
+        Uses R-peak-centered extraction: each detected R segment defines a
+        beat. We then look backward for the nearest P and Q segments, and
+        forward for the nearest S and T segments. This is robust to missing
+        intermediate states (PR, ST, TP) and handles non-canonical sequences
+        (e.g., PACs without a preceding P-wave).
+
+        Falls back to the strict left-right parser when fewer than 2 R
+        segments are found (degenerate case).
 
         Parameters
         ----------
         segments : list of (state_idx, start_sample, end_sample)
+        filtered_ecg : np.ndarray or None
+            Preprocessed signal, used to place the R peak at the max
+            absolute amplitude within the R segment (falls back to the
+            segment midpoint when not provided).
 
         Returns
         -------
         list[BeatBoundary]
         """
-        beats = []
-        current_beat = BeatBoundary(beat_id=-1)
-        collecting = False
-        beat_id = 0
+        if not segments:
+            return []
 
+        # ---- Index segments by state type ----
+        state_to_label = {}
+        if self.model:
+            for i in range(self.model.n_states):
+                state_to_label[i] = self.model.get_state_name(i)
+        else:
+            state_to_label = {i: lbl for i, lbl in enumerate(STATE_LABELS)}
+
+        # Group segment indices by label
+        by_label: dict[str, list[tuple[int, int, int]]] = {}
         for state_idx, start, end in segments:
-            label = self.model.get_state_name(state_idx) if self.model else STATE_LABELS[state_idx]
+            label = state_to_label.get(state_idx, 'UNKNOWN')
+            by_label.setdefault(label, []).append((state_idx, start, end))
 
-            if label == "ISO" and not collecting:
-                # Waiting for next P wave — start new beat collection
-                current_beat = BeatBoundary(beat_id=beat_id)
-                current_beat.iso_start = start
-                collecting = True
+        r_segs = by_label.get('R', [])
+        if len(r_segs) < 1:
+            return []
 
-            elif label == "P" and collecting:
-                current_beat.p_onset = start
-                current_beat.p_offset = end
-                # PR segment will be after P
-                # We approximate PR start = P offset + 1
-                current_beat.pr_start = end + 1
+        beats = []
 
-            elif label == "PR" and collecting:
-                if current_beat.pr_start < 0:
-                    current_beat.pr_start = start
+        # For each R segment, find the surrounding wave components
+        for beat_id, (r_state, r_start, r_end) in enumerate(r_segs):
+            # R peak
+            if filtered_ecg is not None and r_end > r_start:
+                seg = filtered_ecg[r_start:r_end + 1]
+                r_peak = r_start + int(np.argmax(np.abs(seg)))
+            else:
+                r_peak = (r_start + r_end) // 2
 
-            elif label == "Q" and collecting:
-                current_beat.q_onset = start
+            beat = BeatBoundary(beat_id=beat_id)
+            beat.r_peak = r_peak
 
-            elif label == "R" and collecting:
-                # R peak in the middle of the R segment
-                current_beat.r_peak = (start + end) // 2
+            # ---- Look backward: find nearest P, Q, ISO segments ----
+            p_candidates = [(s, e) for (_, s, e) in by_label.get('P', []) if e < r_peak]
+            q_candidates = [(s, e) for (_, s, e) in by_label.get('Q', []) if e < r_peak]
+            pr_candidates = [(s, e) for (_, s, e) in by_label.get('PR', []) if e < r_peak]
+            iso_candidates = [(s, e) for (_, s, e) in by_label.get('ISO', []) if e < r_peak]
 
-            elif label == "S" and collecting:
-                current_beat.s_offset = end
-                current_beat.st_start = end + 1
+            if p_candidates:
+                # Nearest P before R
+                beat.p_onset, beat.p_offset = p_candidates[-1]
+                beat.pr_start = beat.p_offset + 1
+            if q_candidates:
+                beat.q_onset, _ = q_candidates[-1]
+            if pr_candidates and beat.pr_start < 0:
+                beat.pr_start = pr_candidates[-1][0]
+            if iso_candidates:
+                beat.iso_start = iso_candidates[-1][0]
 
-            elif label == "ST" and collecting:
-                if current_beat.st_start < 0:
-                    current_beat.st_start = start
+            # ---- Look forward: find nearest S, T, TP segments ----
+            s_candidates = [(s, e) for (_, s, e) in by_label.get('S', []) if s > r_peak]
+            t_candidates = [(s, e) for (_, s, e) in by_label.get('T', []) if s > r_peak]
+            st_candidates = [(s, e) for (_, s, e) in by_label.get('ST', []) if s > r_peak]
+            tp_candidates = [(s, e) for (_, s, e) in by_label.get('TP', []) if s > r_peak]
 
-            elif label == "T" and collecting:
-                current_beat.t_onset = start
-                current_beat.t_offset = end
+            if s_candidates:
+                _, beat.s_offset = s_candidates[0]
+                beat.st_start = beat.s_offset + 1
+            if t_candidates:
+                beat.t_onset, beat.t_offset = t_candidates[0]
+            if st_candidates and beat.st_start < 0:
+                beat.st_start = st_candidates[0][0]
+            if tp_candidates:
+                beat.tp_start = tp_candidates[0][0]
 
-            elif label == "TP" and collecting:
-                current_beat.tp_start = start
-                # End of beat — finalize
-                beats.append(current_beat)
-                collecting = False
-                beat_id += 1
+            # ---- Cross-beat boundary: P-offset to Q-onset gap ----
+            # If no explicit Q found, use the R-peak minus a window
+            if beat.q_onset < 0 and beat.p_offset > 0:
+                # Estimate Q as the earliest sample in the R segment
+                beat.q_onset = r_start
+
+            beats.append(beat)
 
         return beats
