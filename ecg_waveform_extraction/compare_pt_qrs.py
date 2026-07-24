@@ -64,31 +64,28 @@ def parse_signal(filepath):
 
 
 # =====================================================================
-# Run Pan-Tompkins via neurokit2
+# Run Pan-Tompkins via neurokit2 (on PRE-FILTERED signal)
 # =====================================================================
 def run_pantompkins(signal_raw, fs):
-    """Run neurokit2 Pan-Tompkins 1985 on raw ECG.
+    """Run neurokit2 Pan-Tompkins 1985 on RAW ECG (mV).
+
+    PT has its own internal bandpass filter — must receive raw signal.
+    Returns its own filtered signal for fair polarity calculation.
 
     Returns:
-        clean: filtered ECG
         rpeaks: list of R-peak sample indices
-        qrs_onsets, qrs_offsets: delineated QRS boundaries (one per R-peak)
+        qrs_onsets: delineated Q-onset per beat (-1 if missing)
+        qrs_offsets: delineated S-offset per beat (-1 if missing)
+        clean: PT's own filtered ECG
     """
-    T = len(signal_raw)
     try:
-        # Full pipeline: cleaning + peak detection + delineation
         signals, info = nk.ecg_process(signal_raw, sampling_rate=int(fs))
         clean = signals['ECG_Clean'].values
         rpeaks = info['ECG_R_Peaks']
 
-        # Delineation: get P/QRS/T boundaries
         try:
-            waves, rpeaks_d = nk.ecg_delineate(
-                signals['ECG_Clean'].values,
-                rpeaks,
-                sampling_rate=int(fs),
-                method='peak',
-                show=False,
+            waves, _ = nk.ecg_delineate(
+                clean, rpeaks, sampling_rate=int(fs), method='peak', show=False,
             )
         except Exception:
             waves = {}
@@ -102,7 +99,7 @@ def run_pantompkins(signal_raw, fs):
         qrs_onsets = []
         qrs_offsets = []
 
-    return clean, rpeaks, qrs_onsets, qrs_offsets
+    return rpeaks, qrs_onsets, qrs_offsets, clean
 
 
 def _extract_delineation_list(waves_dict, key, rpeaks):
@@ -212,13 +209,15 @@ def process_record(fname):
             continue
         sig_raw = sig_raw[:MAX_SAMPLES].astype(np.float64)
 
-        # ---- Pan-Tompkins ----
-        pt_clean, pt_rpeaks, pt_qons, pt_soffs = run_pantompkins(sig_raw, fs)
-
-        # ---- HSMM ----
+        # ---- Preprocess (HSMM pipeline) ----
         prep = ECGPreprocessor(fs=fs)
-        hsmm_clean = prep.preprocess(sig_raw)
-        hsmm_result = run_hsmm(hsmm_clean, fs)
+        clean_ecg = prep.preprocess(sig_raw)
+
+        # ---- Pan-Tompkins (on RAW ECG — its own built-in filter) ----
+        pt_rpeaks, pt_qons, pt_soffs, pt_clean = run_pantompkins(sig_raw, fs)
+
+        # ---- HSMM (on our filtered ECG) ----
+        hsmm_result = run_hsmm(clean_ecg, fs)
 
         # Collect HSMM R-peaks and refined boundaries
         hsmm_beats = []  # (beat_id, q_on, r_pk, s_off)
@@ -226,7 +225,7 @@ def process_record(fname):
             if b.q_onset <= 0 or b.r_peak <= 0 or b.s_offset <= 0:
                 continue
             q_on, r_pk, s_off = refine_qrs_boundaries(
-                hsmm_clean, b.q_onset, b.r_peak, b.s_offset, fs,
+                clean_ecg, b.q_onset, b.r_peak, b.s_offset, fs,
             )
             hsmm_beats.append((b.beat_id, q_on, r_pk, s_off))
 
@@ -236,19 +235,18 @@ def process_record(fname):
         # ---- Match R-peaks ----
         matches, match_stats = match_beats(hsmm_r_peaks_list, pt_rpeaks, fs)
 
-        # ---- Polarity comparison on matched beats ----
+        # ---- Polarity comparison (each method on its OWN filtered signal) ----
         polarity_comparison = []
         for bid, pt_idx, time_diff in matches:
-            # HSMM polarity
+            # HSMM polarity (v2 on HSMM-filtered ECG)
             hsmm_q, hsmm_r, hsmm_s = hsmm_map[bid]
             hsmm_pol = compute_qrs_polarity_v2(
-                hsmm_clean, hsmm_q, hsmm_r, hsmm_s, fs, lead_name=lead_name,
+                clean_ecg, hsmm_q, hsmm_r, hsmm_s, fs, lead_name=lead_name,
             )
 
-            # PT polarity (use PT delineation if available, else estimate from PT R-peak)
+            # PT polarity (v2 on PT's own filtered ECG)
             if pt_clean is not None and pt_idx < len(pt_clean):
                 pt_r = int(pt_rpeaks[pt_idx])
-                # Use PT delineation Q/S, or estimate if missing
                 pt_q = pt_qons[pt_idx] if pt_idx < len(pt_qons) and pt_qons[pt_idx] > 0 else max(0, pt_r - int(0.03 * fs))
                 pt_s = pt_soffs[pt_idx] if pt_idx < len(pt_soffs) and pt_soffs[pt_idx] > 0 else min(len(pt_clean) - 1, pt_r + int(0.04 * fs))
 
@@ -294,8 +292,8 @@ def process_record(fname):
         n_total = max(len(polarity_comparison), 1)
         agreement_pct = round(n_agree / n_total * 100, 1)
 
-        # ---- Save overview plot ----
-        _save_comparison_plot(hsmm_clean, pt_clean, fs, rec_name, lead_name,
+        # ---- Save overview plot (two columns: HSMM left, PT right, SAME RAW ECG ref) ----
+        _save_comparison_plot(sig_raw, clean_ecg, pt_clean, fs, rec_name, lead_name,
                              hsmm_beats, pt_rpeaks, pt_qons, pt_soffs,
                              polarity_comparison, rec_dir)
 
@@ -318,65 +316,80 @@ def process_record(fname):
 # =====================================================================
 # Comparison plot
 # =====================================================================
-def _save_comparison_plot(hsmm_clean, pt_clean, fs, rec_name, lead_name,
+def _save_comparison_plot(raw_ecg, hsmm_clean, pt_clean, fs, rec_name, lead_name,
                           hsmm_beats, pt_rpeaks, pt_qons, pt_soffs,
                           polarity_comparison, rec_dir):
-    """Overview plot showing both methods side by side."""
-    if hsmm_clean is None:
-        return
+    """Overview plot: SAME raw ECG as reference in both subplots.
 
-    T = len(hsmm_clean)
+    Two subplots share the identical raw ECG waveform underneath.
+    Top: HSMM colored QRS regions + R peaks
+    Bottom: PT colored QRS regions + R peaks
+    This makes the boundary comparison fair and visually consistent.
+    """
+    T = len(raw_ecg)
     plot_sec = min(T / fs, 4.0)
     n_plot = int(plot_sec * fs)
     t_plot = np.arange(n_plot) / fs
+    e_raw = raw_ecg[:n_plot].astype(np.float64)
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(18, 7), sharex=True)
+    # ---- Light detrend + normalize for display (visual only, not for computation) ----
+    from scipy.signal import medfilt
+    if len(e_raw) > 200:
+        win = min(int(0.2 * fs), len(e_raw) // 3)
+        if win % 2 == 0:
+            win += 1
+        baseline = medfilt(e_raw, kernel_size=win)
+        e_plot = e_raw - baseline
+    else:
+        e_plot = e_raw - np.median(e_raw)
+    e_plot = e_plot / (np.std(e_plot) + 1e-8)
 
-    # ---- HSMM ----
-    e_hsmm = hsmm_clean[:n_plot]
-    ax1.plot(t_plot, e_hsmm, 'k-', linewidth=0.5)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(18, 7), sharex=True,
+                                    gridspec_kw={'hspace': 0.35})
+
     pc = {c['beat_id']: c for c in polarity_comparison}
+
+    # ---- HSMM (top) ----
+    ax1.plot(t_plot, e_plot, 'k-', linewidth=0.5)
     for bid, q_on, r_pk, s_off in hsmm_beats:
         if q_on < n_plot and s_off < n_plot:
             pol = pc.get(bid, {}).get('hsmm', {}).get('polarity', 'N/A')
-            c = POLARITY_COLORS.get(pol, '#9e9e9e')
-            ax1.fill_between(t_plot[q_on:s_off + 1], e_hsmm[q_on:s_off + 1],
-                            alpha=0.30, color=c, linewidth=0)
+            col = POLARITY_COLORS.get(pol, '#9e9e9e')
+            ax1.fill_between(t_plot[q_on:s_off + 1], e_plot[q_on:s_off + 1],
+                            alpha=0.30, color=col, linewidth=0)
             if r_pk < n_plot:
-                ax1.plot(r_pk / fs, e_hsmm[r_pk], 'rv', markersize=4, alpha=0.8)
+                ax1.plot(r_pk / fs, e_plot[r_pk], 'rv', markersize=4, alpha=0.8)
 
     n_match = len(polarity_comparison)
     n_agree = sum(c['polarity_agree'] for c in polarity_comparison)
-    ax1.set_title(f'{rec_name} — Lead {lead_name} — HSMM  |  '
-                  f'{len(hsmm_beats)} beats')
-    ax1.set_ylabel('Amplitude')
+    ax1.set_title(f'HSMM (9-state Viterbi + boundary refinement) — '
+                  f'{len(hsmm_beats)} beats', fontsize=12, fontweight='bold')
+    ax1.set_ylabel('Amplitude (norm)')
     ax1.grid(True, alpha=0.15)
 
-    # ---- Pan-Tompkins ----
-    if pt_clean is not None:
-        e_pt = pt_clean[:n_plot]
-        ax2.plot(t_plot, e_pt, 'k-', linewidth=0.5)
-        for pi, pr in enumerate(pt_rpeaks):
-            if pr < n_plot:
-                # Color by PT polarity from matched comparison
-                pt_pol = 'N/A'
-                for c in polarity_comparison:
-                    if c.get('pt_idx') == pi:
-                        pt_pol = c.get('pt', {}).get('polarity', 'N/A')
-                        break
-                c = POLARITY_COLORS.get(pt_pol, '#9e9e9e')
-                q_on_v = pt_qons[pi] if pi < len(pt_qons) and pt_qons[pi] > 0 else max(0, int(pr) - int(0.03 * fs))
-                s_off_v = pt_soffs[pi] if pi < len(pt_soffs) and pt_soffs[pi] > 0 else min(n_plot - 1, int(pr) + int(0.04 * fs))
-                if q_on_v < n_plot and s_off_v < n_plot:
-                    ax2.fill_between(t_plot[q_on_v:s_off_v + 1], e_pt[q_on_v:s_off_v + 1],
-                                    alpha=0.30, color=c, linewidth=0)
-                ax2.plot(int(pr) / fs, e_pt[int(pr)], 'rv', markersize=4, alpha=0.8)
+    # ---- Pan-Tompkins (bottom, SAME raw reference waveform) ----
+    ax2.plot(t_plot, e_plot, 'k-', linewidth=0.5)
+    for pi, pr in enumerate(pt_rpeaks):
+        if pr < n_plot:
+            pt_pol = 'N/A'
+            for c in polarity_comparison:
+                if c.get('pt_idx') == pi:
+                    pt_pol = c.get('pt', {}).get('polarity', 'N/A')
+                    break
+            col = POLARITY_COLORS.get(pt_pol, '#9e9e9e')
+            q_on_v = pt_qons[pi] if pi < len(pt_qons) and pt_qons[pi] > 0 else max(0, int(pr) - int(0.03 * fs))
+            s_off_v = pt_soffs[pi] if pi < len(pt_soffs) and pt_soffs[pi] > 0 else min(n_plot - 1, int(pr) + int(0.04 * fs))
+            if q_on_v < n_plot and s_off_v < n_plot:
+                ax2.fill_between(t_plot[q_on_v:s_off_v + 1], e_plot[q_on_v:s_off_v + 1],
+                                alpha=0.30, color=col, linewidth=0)
+            ax2.plot(int(pr) / fs, e_plot[int(pr)], 'rv', markersize=4, alpha=0.8)
 
-    ax2.set_title(f'Pan-Tompkins 1985  |  {len(pt_rpeaks)} beats  |  '
+    ax2.set_title(f'Pan-Tompkins 1985 (neurokit2) — {len(pt_rpeaks)} beats  |  '
                   f'Matched: {n_match}  |  Polarity agree: {n_agree}/{n_match} '
-                  f'({n_agree*100//max(n_match,1)}%)')
+                  f'({n_agree*100//max(n_match,1)}%)',
+                  fontsize=12, fontweight='bold')
     ax2.set_xlabel('Time (s)')
-    ax2.set_ylabel('Amplitude')
+    ax2.set_ylabel('Amplitude (norm)')
     ax2.grid(True, alpha=0.15)
 
     fig.tight_layout()
