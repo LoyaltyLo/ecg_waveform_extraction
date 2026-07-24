@@ -34,6 +34,7 @@ POLARITY_COLORS = {
     'positive': '#4caf50',
     'negative': '#f44336',
     'biphasic': '#ff9800',
+    'uncertain': '#9e9e9e',
 }
 
 
@@ -342,7 +343,7 @@ def main():
 def _fmt_pol(counts: dict) -> str:
     """Format polarity counts compactly."""
     parts = []
-    for p in ['positive', 'negative', 'biphasic']:
+    for p in ['positive', 'negative', 'biphasic', 'uncertain']:
         if p in counts:
             parts.append(f'{p[0].upper()}:{counts[p]}')
     return ' '.join(parts)

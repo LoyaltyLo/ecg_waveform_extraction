@@ -38,7 +38,7 @@ N_FILES = 50
 MAX_SAMPLES = 4000
 RPEAK_TOL_MS = 100  # tolerance for matching R-peaks (ms)
 
-POLARITY_COLORS = {'positive': '#4caf50', 'negative': '#f44336', 'biphasic': '#ff9800'}
+POLARITY_COLORS = {'positive': '#4caf50', 'negative': '#f44336', 'biphasic': '#ff9800', 'uncertain': '#9e9e9e'}
 
 
 # =====================================================================

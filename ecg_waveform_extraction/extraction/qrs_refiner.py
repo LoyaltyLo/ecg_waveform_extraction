@@ -362,7 +362,23 @@ def compute_qrs_polarity_v2(ecg_clean: np.ndarray,
         weighted_score += prior * 0.15
 
     # ---- Final polarity decision ----
-    if is_biphasic:
+    # A beat is "uncertain" when criteria are too conflicted to call
+    n_pos_votes = sum(1 for v in votes.values() if v['vote'] == +1)
+    n_neg_votes = sum(1 for v in votes.values() if v['vote'] == -1)
+    vote_split = abs(n_pos_votes - n_neg_votes)
+
+    # Ambiguous only when criteria are TRULY split (2-2, 2-1-1, 1-1-3)
+    # or agreement/score is very near zero. 3-2 splits still get classified.
+    is_ambiguous = (
+        agreement < 0.15 or
+        abs(weighted_score) < 0.18 or
+        vote_split == 0
+    )
+
+    if is_ambiguous:
+        polarity = 'uncertain'
+        confidence = round(float(np.clip(0.15 + agreement * 0.5, 0.1, 0.35)), 3)
+    elif is_biphasic:
         polarity = 'biphasic'
         confidence = min(max(agreement, 0.4) + 0.15, 1.0)
     elif weighted_score >= 0.20:
@@ -372,13 +388,13 @@ def compute_qrs_polarity_v2(ecg_clean: np.ndarray,
         polarity = 'negative'
         confidence = min(agreement + 0.1, 1.0)
     else:
-        # Edge case: very flat signal → undetermined, not biphasic
+        # Edge case: very flat signal → uncertain, not a guess
         if max(abs(detrend)) < 0.02:
-            polarity = 'positive' if weighted_score >= 0 else 'negative'
-            confidence = 0.3
+            polarity = 'uncertain'
+            confidence = 0.2
         else:
-            polarity = 'biphasic'
-            confidence = 0.55
+            polarity = 'uncertain'
+            confidence = 0.4
 
     # Clamp
     confidence = round(float(np.clip(confidence, 0.0, 1.0)), 3)
@@ -473,8 +489,8 @@ def _template_correlation_vote(detrend: np.ndarray, fs: float) -> tuple[int, flo
 def _fallback_result() -> dict:
     """Return a sane default when QRS segment is too short."""
     return {
-        'polarity': 'positive',
-        'confidence': 0.3,
+        'polarity': 'uncertain',
+        'confidence': 0.2,
         'polarity_score': 0.0,
         'criteria': {},
         'energy_ratio': 0.5,
