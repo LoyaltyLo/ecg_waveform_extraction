@@ -1,499 +1,499 @@
-# P-Wave Detection Methods in ECG Signal Processing: A Comprehensive Survey
+# ECG信号P波检测方法：全面综述
 
-> **Date:** 2026-07-31
-> **Scope:** Classical through state-of-the-art methods (2007-2025)
-> **Synthesis basis:** 7 confirmed claims surviving 3-vote adversarial verification, plus broader literature survey
-
----
-
-## Executive Summary
-
-P-wave detection remains the most challenging ECG waveform delineation task due to the wave's inherently low amplitude (typically 0.05-0.25 mV), variable morphology across leads and pathologies, and susceptibility to noise. This survey catalogs seven major methodological families: classical signal processing (threshold, derivative, wavelet), template matching and cross-correlation, statistical/probabilistic approaches (HMM, HSMM, Bayesian), phasor transform techniques, deep learning (CNN, LSTM, Transformers), hybrid multi-stage pipelines, and synthetic-data-driven methods. **The phasor transform method by Saclova et al. (2022)** achieves the best documented balance of interpretability and pathological robustness (Se=96.40%, PP=91.56% on MIT-BIH arrhythmia records), while **I-BEAT (Plaza-Seco et al., 2025)** achieves an F1-score of 94.59% on QTDB+LUDB using deep learning with strict patient separation. **BI-HSMM (2022)** reports the highest single-database P-wave F1 (98.37% on QTDB) through bidirectional prediction from pre-detected QRS complexes. A critical finding across the literature is that pathology-aware methods -- those that explicitly model or detect arrhythmias before attempting P-wave localization -- substantially outperform blind detection on pathological signals. The field is converging toward hybrid architectures that combine the physiological interpretability of probabilistic graphical models with the representation-learning capacity of deep neural networks.
+> **日期：** 2026-07-31
+> **范围：** 经典方法至最新前沿方法（2007-2025）
+> **综合基础：** 7条通过3票对抗验证的确认声明，结合广泛文献调研
 
 ---
 
-## 1. Classical Signal Processing Methods
+## 摘要
 
-### 1.1 Threshold-Based and Derivative-Based Methods
+P波检测是ECG波形识别中最具挑战性的任务，原因在于P波固有的低振幅（通常0.05-0.25 mV）、在不同导联和病理状态下的形态变异性，以及对噪声的敏感性。本综述涵盖七大方法类别：经典信号处理（阈值法、导数法、小波变换）、模板匹配与互相关、统计/概率方法（HMM、HSMM、贝叶斯方法）、相量变换技术、深度学习方法（CNN、LSTM、Transformer）、混合多阶段流水线，以及合成数据驱动方法。**Saclova等人（2022）提出的相量变换方法**在可解释性与病理鲁棒性之间取得了最佳平衡（MIT-BIH心律失常数据：Se=96.40%，PP=91.56%）；**I-BEAT（Plaza-Seco等，2025）**在QTDB+LUDB上采用严格患者分离的深度学习方法，P波F1达到94.59%；**BI-HSMM（2022）**通过从预检测QRS波群进行双向预测，报告了最高单数据库P波F1（QTDB上98.37%）。文献中的一个关键发现是：具有病理感知能力的方法——即在尝试定位P波之前显式建模或检测心律失常的方法——在病理信号上显著优于盲目检测方法。该领域正趋向于将概率图模型的生理可解释性与深度神经网络的表示学习能力相结合的混合架构。
 
-**How they work.** These methods locate P-waves by applying amplitude thresholds to the ECG signal or its derivatives within a search window preceding each QRS complex. A typical pipeline: (a) detect QRS complexes via Pan-Tompkins or a similar energy-based detector; (b) define a P-wave search window extending backward from QRS onset (typically 200-300 ms); (c) apply a low-pass filter (cutoff ~10-15 Hz) to isolate P-wave frequencies; (d) identify the P-wave peak as the local maximum (or minimum, for inverted P-waves) exceeding an adaptive amplitude threshold within the search window; (e) determine onset/offset as the points where the signal or its first derivative crosses a baseline threshold.
+---
 
-Derivative-based variants (e.g., the Laguna et al. method) use the first and second derivatives to locate inflection points marking P-wave boundaries. The method searches for zero-crossings in the second derivative within the P-wave search window, with the logic that the P-wave onset corresponds to the first significant departure from the isoelectric baseline.
+## 1. 经典信号处理方法
 
-**Key references.**
-- Pan, J. & Tompkins, W.J. (1985). "A Real-Time QRS Detection Algorithm." *IEEE Transactions on Biomedical Engineering*, 32(3), 230-236. (The foundational QRS detector upon which most P-wave search windows depend.)
+### 1.1 基于阈值和导数的方法
+
+**工作原理。** 这些方法通过对QRS波群前的搜索窗口内的ECG信号或其导数施加幅度阈值来定位P波。典型流程为：(a) 通过Pan-Tompkins或类似的能量检测器检测QRS波群；(b) 在QRS起始点之前定义P波搜索窗口（通常200-300 ms）；(c) 应用低通滤波器（截止频率约10-15 Hz）以隔离P波频率成分；(d) 将P波峰值识别为搜索窗口内超过自适应幅度阈值的局部最大值（或对于倒置P波为局部最小值）；(e) 将信号或其导数穿过基线阈值的点确定为起始点和终止点。
+
+基于导数的方法（如Laguna等人方法）使用一阶和二阶导数来定位标记P波边界的拐点。该方法在P波搜索窗口内搜索二阶导数的零交叉点，其逻辑是P波起始点对应于首次显著偏离等电位基线的位置。
+
+**关键文献。**
+- Pan, J. & Tompkins, W.J. (1985). "A Real-Time QRS Detection Algorithm." *IEEE Transactions on Biomedical Engineering*, 32(3), 230-236.（大多数P波搜索窗口所依赖的基础性QRS检测器。）
 - Laguna, P., Jane, R., & Caminal, P. (1994). "Automatic detection of wave boundaries in multilead ECG signals: Validation with the CSE database." *Computers and Biomedical Research*, 27(1), 45-60.
 - Daskalov, I.K. & Christov, I.I. (1999). "Electrocardiogram signal preprocessing for automatic detection of QRS boundaries." *Medical Engineering & Physics*, 21(1), 37-44.
 
-**Advantages.**
-- Computationally lightweight (real-time on embedded hardware).
-- No training data required.
-- Highly interpretable -- every decision is traceable to a specific threshold crossing.
-- Well-suited for normal sinus rhythm on clean signals.
+**优点。**
+- 计算量轻，可在嵌入式硬件上实时运行。
+- 无需训练数据。
+- 高度可解释——每个决策都可追溯到特定的阈值穿越。
+- 非常适用于干净信号上的正常窦性心律。
 
-**Limitations.**
-- Thresholds are sensitive to noise, baseline wander, and T-wave overlap.
-- Performance degrades severely on pathological signals (PVCs, AFib, bundle branch blocks), where P-waves may be absent, inverted, or hidden within preceding T-waves.
-- Requires reliable QRS detection as a prerequisite.
-- Reported sensitivity on pathological signals: Se ~70-76%, PP ~55-59% (Maršánová et al., 2019).
+**局限性。**
+- 阈值对噪声、基线漂移和T波重叠敏感。
+- 在病理信号（PVC、房颤、束支传导阻滞）上性能严重下降，此时P波可能缺失、倒置或隐藏在前一个T波中。
+- 需要可靠的QRS检测作为前提条件。
+- 在病理信号上的报告灵敏度：Se约70-76%，PP约55-59%（Maršánová等，2019）。
 
-**Typical performance.** On the QT Database (physiological): Se=96-98%, PP=95-97%. On arrhythmia databases: Se drops to 70-80%, PP drops to 55-65%.
+**典型性能。** QT数据库（生理性）：Se=96-98%，PP=95-97%。心律失常数据库：Se降至70-80%，PP降至55-65%。
 
-### 1.2 Wavelet Transform Methods
+### 1.2 小波变换方法
 
-**How they work.** The wavelet transform decomposes the ECG into multiple frequency sub-bands at different scales. P-wave energy concentrates in specific scales corresponding to the 5-15 Hz frequency range. Method: (a) apply a discrete wavelet transform (DWT) using a mother wavelet resembling the P-wave morphology (commonly quadratic spline, Daubechies, or Symlet); (b) identify zero-crossings or modulus maxima in the wavelet coefficients at scales where P-wave energy dominates; (c) map these feature points back to the time domain to locate P-wave onset, peak, and offset. The multi-scale nature of the wavelet transform provides natural noise immunity, since noise typically concentrates at the finest scales while P-wave signal energy appears at coarser scales.
+**工作原理。** 小波变换将ECG分解为不同尺度的多个频率子带。P波能量集中在对应于5-15 Hz频率范围的特定尺度上。方法为：(a) 使用与P波形态相似的母小波（通常为二次样条、Daubechies或Symlet）应用离散小波变换（DWT）；(b) 在P波能量占主导的尺度上识别小波系数中的零交叉点或模极大值；(c) 将这些特征点映射回时域以定位P波的起始点、峰值和终止点。小波变换的多尺度特性提供了天然的噪声免疫能力，因为噪声通常集中在最细尺度上，而P波信号能量出现在更粗的尺度上。
 
-**Key references.**
+**关键文献。**
 - Li, C., Zheng, C., & Tai, C. (1995). "Detection of ECG characteristic points using wavelet transforms." *IEEE Transactions on Biomedical Engineering*, 42(1), 21-28.
-- Martinez, J.P., Almeida, R., Olmos, S., Rocha, A.P., & Laguna, P. (2004). "A wavelet-based ECG delineator: evaluation on standard databases." *IEEE Transactions on Biomedical Engineering*, 51(4), 570-581. -- One of the most widely cited and validated wavelet delineators.
+- Martinez, J.P., Almeida, R., Olmos, S., Rocha, A.P., & Laguna, P. (2004). "A wavelet-based ECG delineator: evaluation on standard databases." *IEEE Transactions on Biomedical Engineering*, 51(4), 570-581.——引用最广泛、验证最充分的小波波形识别器之一。
 - Addison, P.S. (2005). "Wavelet transforms and the ECG: a review." *Physiological Measurement*, 26(5), R155.
 
-**Advantages.**
-- Multi-scale analysis naturally separates signal from noise.
-- Does not require training data.
-- Robust to moderate baseline wander and muscle noise.
-- The Martinez et al. (2004) delineator is a well-established benchmark with publicly available implementations.
+**优点。**
+- 多尺度分析自然地分离信号与噪声。
+- 无需训练数据。
+- 对中等程度的基线漂移和肌电噪声具有鲁棒性。
+- Martinez等人（2004）的波形识别器是一个有公开实现的、公认的基准。
 
-**Limitations.**
-- Mother wavelet choice affects performance and is somewhat heuristic.
-- Requires QRS detection as a prerequisite for defining P-wave search windows.
-- Performance on pathological P-waves (absent, inverted, biphasic) is limited without additional logic.
-- Computational cost is higher than simple threshold methods (though still real-time capable).
+**局限性。**
+- 母小波的选择会影响性能，且具有一定启发性。
+- 需要QRS检测作为定义P波搜索窗口的前提条件。
+- 在没有额外逻辑的情况下，对病理P波（缺失、倒置、双相）的性能有限。
+- 计算成本高于简单阈值方法（但仍可实时运行）。
 
-**Typical performance.** Martinez et al. (2004) report on QTDB: P-wave Se=98.87%, PP=91.04%. On MIT-BIH Arrhythmia Database, the wavelet method achieves Se=96.5%, PP=93.2% for P-wave detection.
+**典型性能。** Martinez等人（2004）在QTDB上报告：P波Se=98.87%，PP=91.04%。在MIT-BIH心律失常数据库上，小波方法P波检测达到Se=96.5%，PP=93.2%。
 
-### 1.3 Multi-scale Morphological Derivative (MMD)
+### 1.3 多尺度形态学导数（MMD）
 
-**How they work.** The MMD method combines mathematical morphology operations (erosion, dilation, opening, closing) with derivative computation across multiple scales. At each scale, a structuring element is applied to the ECG signal, and the morphological derivative (difference between dilation and erosion) is computed. P-wave peaks correspond to local maxima in the multi-scale product of these derivatives. The approach is particularly effective at suppressing high-frequency noise while preserving the low-amplitude P-wave signal.
+**工作原理。** MMD方法将数学形态学操作（腐蚀、膨胀、开运算、闭运算）与多尺度导数计算相结合。在每个尺度上，对ECG信号应用结构元素，计算形态学导数（膨胀与腐蚀之差）。P波峰值对应于这些导数多尺度乘积中的局部最大值。该方法在抑制高频噪声的同时保留低振幅P波信号方面特别有效。
 
-**Key references.**
+**关键文献。**
 - Sun, Y., Chan, K.L., & Krishnan, S.M. (2005). "Characteristic wave detection in ECG signal using morphological transform." *BMC Cardiovascular Disorders*, 5, 28.
 - Sun, Y., Chan, K.L., & Krishnan, S.M. (2006). "ECG signal conditioning by morphological filtering." *Computers in Biology and Medicine*, 36(4), 339-356.
 
-**Advantages.**
-- Excellent noise suppression while preserving wave morphology.
-- Does not require frequency-domain transformations.
-- Structuring element shapes can be tailored to expected P-wave morphology.
+**优点。**
+- 在保留波形形态的同时具有出色的噪声抑制能力。
+- 无需频域变换。
+- 结构元素的形状可根据预期P波形态进行定制。
 
-**Limitations.**
-- Structuring element size and shape must be tuned for the target sampling rate and lead configuration.
-- Less extensively validated than wavelet methods.
-- Performance on highly variable pathological morphologies is not well-characterized in the literature.
+**局限性。**
+- 结构元素的大小和形状必须针对目标采样率和导联配置进行调整。
+- 与小波方法相比验证不够广泛。
+- 在高度可变的病理形态上的性能在文献中描述不充分。
 
-**Typical performance.** Reported sensitivity for P-wave peak detection on 100 QTDB signals: 96-98% range in the original Sun et al. studies. Note: a claim of 99.81% sensitivity was refuted in adversarial verification -- the reviewed literature places MMD performance closer to the mid-90s.
+**典型性能。** Sun等人的原始研究中，100个QTDB信号上P波峰值检测的报告灵敏度在96-98%范围内。注意：99.81%灵敏度的声明在对抗验证中被驳斥——文献回顾将MMD性能定位在中90%范围内。
 
 ---
 
-## 2. Template Matching and Cross-Correlation Techniques
+## 2. 模板匹配与互相关技术
 
-### 2.1 User-Defined Template Matching
+### 2.1 用户定义模板匹配
 
-**How they work.** The algorithm maintains a user-defined P-wave template (1-3 leads), which is cross-correlated against the ECG signal within a search window preceding each QRS complex. The template is automatically updated by averaging newly detected P-waves that achieve high correlation scores with the current template. This creates a positive feedback loop: as more P-waves are detected with high confidence, the template becomes more representative of the patient's specific P-wave morphology. The correlation is typically supplemented with amplitude and area similarity checks to reduce false positives from noise transients that happen to correlate in shape.
+**工作原理。** 算法维护一个用户定义的P波模板（1-3个导联），在QRS波群前的搜索窗口内与ECG信号进行互相关。模板通过与当前模板相关性高的新检测P波进行平均来自动更新。这形成了一个正反馈循环：随着更多高置信度P波被检测到，模板变得更代表患者特定的P波形态。相关性通常辅以幅度和面积相似性检查，以减少因形状偶然相关的噪声瞬变带来的假阳性。
 
-**Key references.**
-- Censi, F., Calcagnini, G., Ricci, C., Ricci, R.P., & Santini, M. (2007). "P-wave morphology assessment by a Gaussian functions-based model in atrial fibrillation patients." *Journal of Electrocardiology*, 40(6), S69. (Describes the user-defined template with automatic updating via correlation-weighted averaging.)
+**关键文献。**
+- Censi, F., Calcagnini, G., Ricci, C., Ricci, R.P., & Santini, M. (2007). "P-wave morphology assessment by a Gaussian functions-based model in atrial fibrillation patients." *Journal of Electrocardiology*, 40(6), S69.（描述了通过相关性加权平均自动更新的用户定义模板。）
 
-**Advantages.**
-- Adapts to patient-specific P-wave morphology over time.
-- Multi-lead templates capture spatial information lost in single-lead methods.
-- Intuitive workflow for clinical applications: clinician selects representative beats, algorithm propagates.
+**优点。**
+- 随时间适应用户特定的P波形态。
+- 多导联模板捕获单导联方法丢失的空间信息。
+- 直观的临床工作流程：临床医生选择代表性心搏，算法进行传播。
 
-**Limitations.**
-- Requires user interaction for initial template definition (not fully automated).
-- Template update mechanism can drift if low-quality P-waves are accidentally incorporated.
-- Assumes P-wave morphology is relatively stable within a recording -- fails for recordings with intermittent morphological changes (e.g., intermittent bundle branch block, ectopic atrial rhythms).
-- The 2007 publication is an older method; it has been superseded by fully automated approaches.
+**局限性。**
+- 需要用户交互来定义初始模板（非全自动）。
+- 如果低质量P波被意外纳入，模板更新机制可能漂移。
+- 假设记录内P波形态相对稳定——对于具有间歇性形态变化（如间歇性束支传导阻滞、异位房性心律）的记录失效。
+- 2007年的出版物是较旧的方法，已被全自动方法超越。
 
-**Typical performance.** The method reports specificity of 97.9% +/- 2.1% on 30-minute segments from 9 patients. Note: a claim of sensitivity in the 98% range was refuted in adversarial verification; the reviewed literature confirms high specificity but moderate sensitivity on pathological signals.
+**典型性能。** 该方法报告在9位患者的30分钟片段上特异性为97.9% +/- 2.1%。注意：灵敏度在98%范围的声明在对抗验证中被驳斥——文献确认高特异性但在病理信号上灵敏度中等。
 
-### 2.2 Correlation-Enhanced Multi-Feature Template Methods
+### 2.2 相关性增强多特征模板方法
 
-**How they work.** Building on the basic template concept, these methods augment cross-correlation with additional feature-based similarity metrics: amplitude ratio (peak-to-peak), area under the curve, and morphological descriptors (width at half-maximum, rising/falling slope ratios). A detection is accepted only if multiple similarity criteria are simultaneously satisfied, reducing false positives from noise. Some implementations use dynamic time warping (DTW) instead of simple cross-correlation to handle physiological variability in P-wave duration.
+**工作原理。** 在基本模板概念基础上，这些方法使用额外的基于特征的相似性度量来增强互相关：幅度比（峰峰值）、曲线下面积以及形态描述符（半高处宽度、上升/下降斜率比）。只有当多个相似性标准同时满足时才接受检测，减少噪声假阳性。一些实现使用动态时间规整（DTW）代替简单互相关以处理P波时长的生理变异性。
 
-**Key references.**
+**关键文献。**
 - Ghaffari, A., Homaeinezhad, M.R., Akraminia, M., Atarod, M., & Daevaieha, M. (2009). "A robust wavelet-based multi-lead electrocardiogram delineation algorithm." *Medical Engineering & Physics*, 31(10), 1219-1227.
-- This project's own `PWaveExtractor._template_match()` method implements an automatically accumulated template pool with resampled cross-correlation scoring using Pearson's r.
+- 本项目的 `PWaveExtractor._template_match()` 方法实现了自动累积模板池，使用重采样后的Pearson r进行互相关评分。
 
-**Advantages.**
-- Multi-metric fusion reduces false positives compared to single-metric template matching.
-- DTW handles physiological beat-to-beat duration variability.
-- Automatically accumulated templates eliminate the need for user-defined initialization.
+**优点。**
+- 与单度量模板匹配相比，多度量融合减少假阳性。
+- DTW处理生理性逐搏时长变异性。
+- 自动累积模板消除了用户定义初始化的需要。
 
-**Limitations.**
-- Template accumulation assumes the first few beats are normal -- fails if the recording opens with arrhythmia.
-- Template-based methods fundamentally struggle with morphological changes (ectopic P-waves, rate-dependent changes).
-- Cross-correlation provides no information about P-wave onset/offset -- only the peak location.
+**局限性。**
+- 模板累积假设前几个心搏正常——如果记录以心律失常开始则失效。
+- 基于模板的方法从根本上难以处理形态变化（异位P波、频率依赖性变化）。
+- 互相关不提供P波起始/终止信息——仅提供峰值位置。
 
-**Typical performance.** In this project's implementation, template matching serves as a fallback mechanism when the primary HSMM decoder fails. It reliably recovers P-waves with correlation > 0.4 in low-SNR conditions where the HSMM produces no detection, but is not benchmarked as a standalone detector.
+**典型性能。** 在本项目实现中，模板匹配作为主HSMM解码器失败时的后备机制。在低SNR条件下（HSMM无检测输出），能可靠恢复相关性>0.4的P波，但未作为独立检测器进行基准测试。
 
 ---
 
-## 3. Statistical and Probabilistic Methods
+## 3. 统计与概率方法
 
-### 3.1 Hidden Markov Models (HMM)
+### 3.1 隐马尔可夫模型（HMM）
 
-**How they work.** An HMM models the ECG as a sequence of hidden states (ISO, P, PR, QRS, ST, T, TP) with Markov transitions between them. Each state emits observations (ECG samples or features) according to a learned probability distribution (typically a Gaussian or Gaussian Mixture Model). The Viterbi algorithm finds the most likely state sequence given the observations, implicitly performing beat segmentation and wave delineation simultaneously. The state duration is modeled implicitly through the self-transition probability, which yields geometrically distributed durations -- a limitation that HSMMs address.
+**工作原理。** HMM将ECG建模为具有Markov转移的隐状态序列（ISO、P、PR、QRS、ST、T、TP）。每个状态根据学习的概率分布（通常为高斯分布或高斯混合模型）发射观测（ECG样本或特征）。Viterbi算法在给定观测的情况下找到最可能的状态序列，隐式地同时执行心搏分割和波形识别。状态时长通过自转移概率隐式建模，产生几何分布的时长——这是HSMM要解决的一个局限性。
 
-**Key references.**
-- Coast, D.A., Stern, R.M., Cano, G.G., & Briller, S.A. (1990). "An approach to cardiac arrhythmia analysis using hidden Markov models." *IEEE Transactions on Biomedical Engineering*, 37(9), 826-836. (Pioneering application of HMMs to ECG.)
+**关键文献。**
+- Coast, D.A., Stern, R.M., Cano, G.G., & Briller, S.A. (1990). "An approach to cardiac arrhythmia analysis using hidden Markov models." *IEEE Transactions on Biomedical Engineering*, 37(9), 826-836.（HMM在ECG上的开创性应用。）
 - Andreao, R.V., Dorizzi, B., & Boudy, J. (2006). "ECG signal analysis through hidden Markov models." *IEEE Transactions on Biomedical Engineering*, 53(8), 1541-1549.
 - Hughes, N.P., Tarassenko, L., & Roberts, S.J. (2004). "Markov models for automated ECG interval analysis." *Advances in Neural Information Processing Systems (NeurIPS)*, 16.
 
-**Advantages.**
-- Probabilistic framework provides confidence scores for every segmentation decision.
-- Simultaneously segments all waves (P, QRS, T) in a single unified inference.
-- Trained models can incorporate prior knowledge about ECG physiology through transition topology constraints.
+**优点。**
+- 概率框架为每个分割决策提供置信度分数。
+- 在单次统一推理中同时分割所有波形（P、QRS、T）。
+- 训练模型可通过转移拓扑约束纳入ECG生理先验知识。
 
-**Limitations.**
-- Geometric duration distribution poorly models ECG wave durations, which are approximately Gaussian with a hard minimum.
-- Viterbi decoding can produce physically implausible state sequences when observation likelihoods are ambiguous.
-- Training requires labeled ECG recordings, which are labor-intensive to produce.
-- Performance on pathological signals is limited without explicit pathology modeling.
+**局限性。**
+- 几何时长分布不良地建模了ECG波形时长，后者近似为具有硬最小值的高斯分布。
+- 当观测似然模糊时，Viterbi解码可能产生物理上不可信的状态序列。
+- 训练需要带标注的ECG记录，制作成本高。
+- 在没有显式病理建模的情况下，对病理信号的性能受限。
 
-**Typical performance.** On QTDB: P-wave Se=90-95%, PP=85-92%. Performance degrades to Se=70-80% on arrhythmia databases.
+**典型性能。** QTDB：P波Se=90-95%，PP=85-92%。心律失常数据库性能下降至Se=70-80%。
 
-### 3.2 Hidden Semi-Markov Models (HSMM)
+### 3.2 隐半马尔可夫模型（HSMM）
 
-**How they work.** HSMMs extend HMMs by replacing the implicit geometric duration model with an explicit, state-specific duration distribution (typically a Gaussian or Gamma distribution truncated to a minimum duration). This is the key architectural improvement: the HSMM explicitly models that a P-wave lasts approximately 80-120 ms (not 20 ms or 300 ms), and that this duration constraint is physiologically meaningful. The modified Viterbi algorithm jointly optimizes over both state sequence and state durations, computing:
+**工作原理。** HSMM通过用显式的、状态特定的时长分布（通常为截断到最小时长的高斯或Gamma分布）替换隐式几何时长模型来扩展HMM。这是关键的架构改进：HSMM显式建模P波持续约80-120 ms（而非20 ms或300 ms），且该时长约束具有生理意义。改进的Viterbi算法联合优化状态序列和状态时长，计算如下：
 
 ```
 delta_t(j) = max_d [ p_j(d) * b_j(o_{t-d+1:t}) * max(pi_j * 1{start=0}, max_i delta_{t-d}(i) * a_ij) ]
 ```
 
-Where `p_j(d)` is the explicit duration probability for state `j` lasting `d` samples, and `b_j(o)` is the observation likelihood.
+其中 `p_j(d)` 是状态 `j` 持续 `d` 个样本的显式时长概率，`b_j(o)` 是观测似然。
 
-**Key references.**
+**关键文献。**
 - Hughes, N.P. & Tarassenko, L. (2003). "Automated QT interval analysis with a hidden semi-Markov model." *Computers in Cardiology*, 30, 321-324.
-- **This project's implementation** (`hsmm/`): A 9-state left-right HSMM with GMM observation densities and truncated Gaussian duration priors using vectorized Viterbi decoding. The project also implements a specialized 3-state focused HSMM (ISO_before -> P -> PR_after) in `PWaveExtractor._build_p_wave_model()` for refined P-wave boundary extraction after initial beat segmentation.
+- **本项目的实现** (`hsmm/`)：具有GMM观测密度和截断高斯时长先验的9状态左-右HSMM，使用向量化Viterbi解码。项目还在 `PWaveExtractor._build_p_wave_model()` 中实现了专门的三状态聚焦HSMM（ISO_before -> P -> PR_after），用于初始心搏分割后的精细化P波边界提取。
 
-**Advantages.**
-- Explicit duration modeling produces more physiologically plausible segmentations than HMMs.
-- Can incorporate ECG-domain knowledge through physiological duration priors (e.g., P-wave duration adapts to heart rate).
-- Produces per-sample state labels, enabling precise onset/offset determination.
-- Computationally tractable with vectorized Viterbi implementations.
+**优点。**
+- 显式时长建模产生比HMM更符合生理的分割结果。
+- 可通过生理时长先验（如P波时长随心率适应）纳入ECG领域知识。
+- 产生逐样本状态标签，实现精确的起始/终止确定。
+- 使用向量化Viterbi实现在计算上可追踪。
 
-**Limitations.**
-- The O(T * N * D_max) Viterbi complexity is higher than HMM's O(T * N^2), though still linear in sequence length.
-- Left-right topology enforces a fixed state ordering that does not accommodate all arrhythmias.
-- Training via EM (Baum-Welch for HSMMs) is more complex and less stable than HMM training.
-- Performance depends heavily on the quality of the duration priors and feature extraction.
+**局限性。**
+- O(T * N * D_max) Viterbi复杂度高于HMM的O(T * N^2)，但仍与序列长度线性相关。
+- 左-右拓扑强制固定状态排序，不能适应所有心律失常。
+- 通过EM（HSMM的Baum-Welch）训练比HMM训练更复杂且不稳定。
+- 性能高度依赖于时长先验和特征提取的质量。
 
-**Typical performance.** This project's HSMM achieves reliable P-wave detection on normal sinus rhythm recordings with multi-dimensional confidence scoring (SNR + symmetry + consistency + duration). The method successfully distinguishes P-wave absence (AFib) from detection failure, achieving morphology classification into normal/biphasic/peaked/inverted/absent/low-amplitude categories.
+**典型性能。** 本项目的HSMM通过多维置信度评分（SNR + 对称性 + 一致性 + 时长）在正常窦性心律记录上实现可靠的P波检测。该方法成功区分P波缺失（房颤）与检测失败，实现正常/双相/尖峰/倒置/缺失/低幅度/未确定的形态分类。
 
-### 3.3 Bidirectional HSMM (BI-HSMM)
+### 3.3 双向HSMM（BI-HSMM）
 
-**How they work.** The BI-HSMM method introduces a critical architectural innovation: instead of a single left-to-right pass through the cardiac cycle, it first detects QRS boundaries (the easiest wave to detect reliably), then runs the HSMM **backward** from QRS onset to locate the P-wave and PQ segment, and **forward** from QRS offset to locate ST, T, and TP segments. This bidirectional strategy specifically addresses a fundamental difficulty in P-wave detection: the P-wave is the most distal wave from the anchoring QRS complex in a forward-only search, accumulating positional uncertainty from ISO, P, and PR state transitions. By running backward from a reliably detected QRS onset, the decoder's uncertainty is minimized precisely in the region of interest.
+**工作原理。** BI-HSMM方法引入了一个关键的架构创新：不是单一从左到右遍历心动周期，而是首先检测QRS边界（最容易可靠检测的波形），然后从QRS起始点**向后**运行HSMM以定位P波和PQ段，从QRS终止点**向前**运行以定位ST、T和TP段。这种双向策略专门解决了P波检测的一个基本困难：在纯前向搜索中，P波是距离锚定QRS波群最远的波形，累积了来自ISO、P和PR状态转移的位置不确定性。通过从可靠检测的QRS起始点向后运行，解码器的不确定性在感兴趣区域恰好最小化。
 
-**Key references.**
-- Liu, J., Jin, Y., Liu, Y., Li, Z., & Sun, C. (2022). "BI-HSMM: A bidirectional hidden semi-Markov model for ECG signal segmentation." *Computers in Biology and Medicine*, 150, 106147. (DOI: 10.1016/j.compbiomed.2022.106147)
+**关键文献。**
+- Liu, J., Jin, Y., Liu, Y., Li, Z., & Sun, C. (2022). "BI-HSMM: A bidirectional hidden semi-Markov model for ECG signal segmentation." *Computers in Biology and Medicine*, 150, 106147.（DOI: 10.1016/j.compbiomed.2022.106147）
 
-**Performance on QTDB (reported):**
-| Wave | F1 Score |
+**QTDB上的报告性能：**
+| 波形 | F1 分数 |
 |------|----------|
 | P    | 98.37%   |
 | QRS  | 97.60%   |
 | T    | 97.79%   |
 
-The P-wave F1 score of 98.37% is the highest reported single-database result for P-wave detection among all methods surveyed, though the unusual ordering (P > T > QRS, which inverts the well-known difficulty hierarchy) raises methodological questions about the evaluation protocol.
+98.37%的P波F1分数是所有调查方法中报告的P波检测最高单数据库结果，尽管异常的排序（P > T > QRS，颠倒了公认的难度层次）对评估方案提出了方法学上的质疑。
 
-**Advantages.**
-- Backward decoding from reliably detected QRS anchors reduces cumulative positional uncertainty for the P-wave.
-- Explicitly models the physiological fact that QRS detection is far more reliable than P-wave detection.
-- Maintains the probabilistic interpretability of HSMMs.
+**优点。**
+- 从可靠检测的QRS锚点向后解码减少了P波的累积位置不确定性。
+- 显式建模了QRS检测远可靠于P波检测的生理事实。
+- 保持HSMM的概率可解释性。
 
-**Limitations.**
-- Performance on QRS (97.60%) being lower than P-wave (98.37%) is anomalous and suggests possible evaluation artifacts (e.g., different tolerances for QRS vs. P-wave correct detection).
-- Requires reliable QRS detection as a prerequisite -- the backward pass cannot recover from QRS detection failures.
-- The method has not been independently validated outside the original research group.
-- The bidirectional strategy is not universally adopted: this project's HSMM implementation uses standard forward Viterbi decoding.
+**局限性。**
+- QRS上的性能（97.60%）低于P波（98.37%）是异常的，提示可能的评估伪影（如QRS与P波正确检测的不同容忍度）。
+- 需要可靠的QRS检测作为前提——向后过程无法从QRS检测失败中恢复。
+- 该方法尚未在原始研究组之外进行独立验证。
+- 双向策略未被普遍采用：本项目的HSMM实现使用标准前向Viterbi解码。
 
-**Verified status.** Two confirming votes, one dissenting. The claim about the bidirectional strategy is confirmed by the source quote; the specific performance improvement claim is from the paper's own results section which could not be independently re-verified. Confidence: **medium**.
+**验证状态。** 两票确认，一票反对。关于双向策略的声明由来源引用确认；具体的性能提升声明来自论文自身的结果部分，无法独立重新验证。置信度：**中等**。
 
 ---
 
-## 4. Phasor Transform Methods
+## 4. 相量变换方法
 
-### 4.1 Principle and Mathematical Formulation
+### 4.1 原理与数学公式
 
-**How it works.** The phasor transform maps each ECG sample x(n) into a complex plane:
+**工作原理。** 相量变换将每个ECG样本 x(n) 映射到复平面：
 
 ```
 y(n) = R_V + j * x(n)
 phi(n) = arctan(x(n) / R_V)
 ```
 
-where R_V is a small constant (typically 0.001 to 0.003). The key insight is that the arctan function acts as a nonlinear amplifier: as R_V approaches zero, the phase (phi) approaches +/- pi/2, maximizing the phase variation produced by even very small amplitude changes. In the phasor domain:
+其中 R_V 是一个小常数（通常0.001到0.003）。关键洞察是arctan函数充当非线性放大器：随着R_V趋近于零，相位(phi)趋近于±π/2，最大化即使非常小的幅度变化所产生的相位变化。在相量域中：
 
-- **QRS complexes** always maintain the highest amplitude regardless of their relative amplitude in the original ECG. This holds even when T-waves exceed QRS amplitude in the raw signal -- a clinically common scenario in hyperkalemia, early repolarization, and certain lead configurations.
-- **P and T waves** produce distinct phase excursions that are more easily separable from noise than in the time domain, because the arctan compression amplifies small-amplitude variations while saturating large ones.
+- **QRS波群**无论原始ECG中的相对幅度如何，始终保持最高幅度。即使在原始信号中T波超过QRS幅度的临床常见情况下（高钾血症、早期复极及某些导联配置），这一点仍然成立。
+- **P波和T波**产生比时域中更容易与噪声分离的显著相位偏移，因为arctan压缩放大小幅度变化同时饱和大幅度变化。
 
-**Key references.**
-- Martinez, A., Alcaraz, R., & Rieta, J.J. (2010). "Application of the phasor transform for automatic delineation of single-lead ECG fiducial points." *Physiological Measurement*, 31(11), 1467-1485. (DOI: 10.1088/0967-3334/31/11/005) -- The foundational paper introducing the phasor transform for ECG delineation.
-- Saclova, L. (2022). *Advanced Methods for ECG Holter Monitoring Signals Analysis*. Doctoral dissertation, Brno University of Technology. (Available at: https://theses.cz/id/ifdkfz/)
-- Saclova, L., Nemcova, A., Smisek, R., Vitek, M., & Maršánová, L. (2022). "A pathology-aware P-wave detector based on the phasor transform." *Scientific Reports*, 12, 6576. (DOI: 10.1038/s41598-022-10656-4)
+**关键文献。**
+- Martinez, A., Alcaraz, R., & Rieta, J.J. (2010). "Application of the phasor transform for automatic delineation of single-lead ECG fiducial points." *Physiological Measurement*, 31(11), 1467-1485.（DOI: 10.1088/0967-3334/31/11/005）——介绍相量变换用于ECG波形识别的基础性论文。
+- Saclova, L. (2022). *Advanced Methods for ECG Holter Monitoring Signals Analysis*. 博士论文，布尔诺理工大学。（来源：https://theses.cz/id/ifdkfz/）
+- Saclova, L., Nemcova, A., Smisek, R., Vitek, M., & Maršánová, L. (2022). "A pathology-aware P-wave detector based on the phasor transform." *Scientific Reports*, 12, 6576.（DOI: 10.1038/s41598-022-10656-4）
 
-### 4.2 Pathology-Aware Decision Rules (Saclova et al., 2022)
+### 4.2 病理感知决策规则（Saclova等，2022）
 
-The Saclova method is distinguished by its integration of pathology-specific decision rules into the detection pipeline:
+Saclova方法的显著特点是其将病理特异性决策规则集成到检测流水线中：
 
-1. **Atrial Fibrillation (AF) detection:** Shannon entropy of RR interval symbolic dynamics is computed over a 59-beat sliding window. When entropy exceeds 0.737, the beat is classified as AF. **If AF is detected, the algorithm does not search for a P-wave at all** -- recognizing that P-waves are typically absent or replaced by fibrillatory waves during AF.
+1. **房颤（AF）检测：** 在59心搏滑动窗口上计算RR间期符号动力学的Shannon熵。当熵超过0.737时，该心搏被分类为AF。**如果检测到AF，算法根本不搜索P波**——认识到在AF期间P波通常缺失或被纤颤波替代。
 
-2. **Premature Ventricular Contraction (PVC) handling:** PVCs are detected by comparing the area under the QRS curve (AUC) to the median AUC of preceding beats. A beat is classified as PVC if its AUC exceeds 1.3x the median. When a beat is flagged as PVC, P-wave detection is terminated for that beat (since the PVC may obscure or replace the atrial activation).
+2. **室性早搏（PVC）处理：** 通过比较QRS曲线下面积（AUC）与先前心搏的中位AUC来检测PVC。如果心搏的AUC超过中位数的1.3倍，则被标记为PVC。**当心搏被标记为PVC时，该心搏的P波检测被终止**（因为PVC可能掩盖或替代房性激动）。
 
-3. **Safeguard against misclassification:** If more than 50% of beats in the AF detection window are PVCs, the elevated entropy is attributed to PVC irregularity rather than AF, preventing false AF classification.
+3. **误分类防护：** 如果AF检测窗口中超过50%的心搏是PVC，升高的熵被归因于PVC不规则性而非AF，防止错误的AF分类。
 
-This contrasts with earlier methods (e.g., Portet, Laguna) that blindly attempt P-wave detection regardless of rhythm state, achieving only Se=70.37%, PP=59.41% on PVC signals.
+这与早期方法（如Portet、Laguna）形成对比，后者无论心律状态如何都盲目尝试P波检测，在PVC信号上仅达到Se=70.37%、PP=59.41%。
 
-### 4.3 Performance
+### 4.3 性能指标
 
-| Database | Condition | Sensitivity (Se) | Positive Predictivity (PP) |
-|----------|-----------|------------------|---------------------------|
-| MIT-BIH Arrhythmia DB | Physiological | 98.56% | 99.82% |
-| QT Database | Physiological | 99.23% | 99.12% |
-| MIT-BIH Arrhythmia DB | Pathological (8 records) | 96.40% | 91.56% |
-| BUT PDB | Pathological (50 records, 23 types) | 93.07% | 88.60% |
+| 数据库 | 条件 | 灵敏度(Se) | 阳性预测率(PP) |
+|--------|------|-----------|---------------|
+| MIT-BIH心律失常数据库 | 生理性 | 98.56% | 99.82% |
+| QT数据库 | 生理性 | 99.23% | 99.12% |
+| MIT-BIH心律失常数据库 | 病理性（8条记录） | 96.40% | 91.56% |
+| BUT PDB | 病理性（50条记录，23种类型） | 93.07% | 88.60% |
 
-**Key caveats:**
-- The "physiological" MITDB evaluation uses MIT PDB annotations applied to MITDB signals, not MITDB's native annotations.
-- The MITDB pathological evaluation covers only 8 specific records (106, 119, 207, 214, 222, 223, 231).
-- The BUT PDB is the authors' own database (50 two-minute, two-lead records), limiting independent generalizability assessment.
-- On physiological signals, the phasor method is comparable to (not decisively better than) existing methods -- other published methods achieve Se=99.84-99.85% on QTDB.
+**关键注意事项：**
+- MITDB"生理性"评估使用应用于MITDB信号的MIT PDB标注，而非MITDB的原生标注。
+- MITDB病理评估仅涵盖8条特定记录（106、119、207、214、222、223、231）。
+- BUT PDB是作者自己的数据库（50条两分钟两导联记录），限制了独立泛化性评估。
+- 在生理信号上，相量方法与其他已发表方法相当（非决定性更优）——其他方法在QTDB上达到Se=99.84-99.85%。
 
-**Verified status.** All three phasor-transform claims confirmed by unanimous or near-unanimous votes. The pathology-aware decision rules are confirmed by the published paper's methods section. Performance numbers are verbatim from peer-reviewed sources.
+**验证状态。** 所有三条相量变换声明由一致或接近一致的投票确认。病理感知决策规则由已发表论文的方法部分确认。性能数字逐字来自同行评审来源。
 
 ---
 
-## 5. Deep Learning Approaches
+## 5. 深度学习方法
 
-### 5.1 CNN-Based Semantic Segmentation
+### 5.1 基于CNN的语义分割
 
-**How they work.** Convolutional neural networks are trained to perform pixel-level (sample-level) classification of ECG signals into waveform classes (P, QRS, T, isoelectric). Architectures adapted from computer vision semantic segmentation -- U-Net, FCN, HRNetV2, U-Net 3+ -- have been applied to 1D ECG signals. Key design elements: (a) encoder-decoder structure with skip connections to preserve fine temporal resolution; (b) multi-scale feature extraction via dilated convolutions or pyramid pooling; (c) post-processing with physiological constraints (P must precede QRS, realistic duration ranges).
+**工作原理。** 卷积神经网络被训练以对ECG信号执行像素级（样本级）分类，将其分为波形类别（P、QRS、T、等电位）。从计算机视觉语义分割改编而来的架构——U-Net、FCN、HRNetV2、U-Net 3+——已被应用于一维ECG信号。关键设计要素：(a) 具有跳跃连接的编码器-解码器结构以保持精细时间分辨率；(b) 通过膨胀卷积或金字塔池化的多尺度特征提取；(c) 使用生理约束（P必须在QRS之前、现实的时长范围）的后处理。
 
-**Key references.**
+**关键文献。**
 - Moskalenko, V., Zolotykh, N., & Osipov, G. (2020). "Deep Learning for ECG Segmentation." *Studies in Computational Intelligence*, 856, 197-208.
 - Jimenez-Perez, G., Alcaine, A., & Camara, O. (2021). "ECG-DelNet: Deep learning for ECG delineation." *Physiological Measurement*, 42(8).
-- Park, J. et al. (2025). "Comparative Analysis of CNN and Transformer Models for ECG Delineation." *Proceedings of Machine Learning Research*, 287.
+- Park, J. 等. (2025). "Comparative Analysis of CNN and Transformer Models for ECG Delineation." *Proceedings of Machine Learning Research*, 287.
 
-**Advantages.**
-- End-to-end learning: no hand-crafted features or explicit QRS detection prerequisite.
-- Semantic segmentation naturally handles the multi-class, per-sample labeling problem.
-- Can learn complex, non-linear mappings from raw ECG to waveform labels.
+**优点。**
+- 端到端学习：无需手工特征或显式QRS检测前提。
+- 语义分割自然地处理多类别、逐样本标注问题。
+- 能够学习从原始ECG到波形标签的复杂非线性映射。
 
-**Limitations.**
-- Requires large annotated datasets (thousands of recordings) which are expensive to produce.
-- CNN receptive field is limited; long-range dependencies (e.g., rate-dependent P-wave changes) may be missed.
-- Prone to physiologically implausible outputs (e.g., P-wave after QRS) without post-processing constraints.
-- Cross-database generalization remains challenging.
+**局限性。**
+- 需要大量标注数据集（数千条记录），制作成本高。
+- CNN感受野有限；长程依赖（如频率依赖性P波变化）可能被遗漏。
+- 在没有后处理约束的情况下容易产生生理上不可信的输出（如P波在QRS之后）。
+- 跨数据库泛化仍然具有挑战性。
 
-**Typical performance.** U-Net 3+ achieves the best overall mIoU on the public LUDB dataset at 0.854. FCN achieves mIoU of 0.785 on a private disease-dominated dataset. Typical P-wave F1-scores on LUDB: 85-92%.
+**典型性能。** U-Net 3+在公开LUDB数据集上达到最佳总体mIoU 0.854。FCN在私有疾病为主的数据集上达到mIoU 0.785。LUDB上典型P波F1分数：85-92%。
 
-### 5.2 LSTM and ConvLSTM Architectures
+### 5.2 LSTM和ConvLSTM架构
 
-**How they work.** Long Short-Term Memory (LSTM) networks model the sequential nature of ECG signals, capturing long-range dependencies across the cardiac cycle. ConvLSTM architectures combine convolutional feature extraction with LSTM temporal modeling: convolutional layers extract local morphological features at each time step, while LSTM layers model the sequential ordering of ECG waves (ISO -> P -> PR -> QRS -> ST -> T -> TP). The recurrent structure naturally enforces the physiological constraint that waves appear in a specific order.
+**工作原理。** 长短期记忆（LSTM）网络建模ECG信号的序列性质，捕获心动周期中的长程依赖关系。ConvLSTM架构将卷积特征提取与LSTM时序建模相结合：卷积层在每个时间步提取局部形态特征，LSTM层建模ECG波形的序列顺序（ISO -> P -> PR -> QRS -> ST -> T -> TP）。递归结构自然地强制了波形以特定顺序出现的生理约束。
 
-**Key references.**
+**关键文献。**
 - Peimankar, A. & Puthusserypady, S. (2021). "DENS-ECG: A deep learning approach for ECG signal delineation." *Expert Systems with Applications*, 165, 113911.
-- Chen, M. et al. (2025). "A three-stage pipeline with ConvLSTM-MA for ECG delineation." *Biomedical Signal Processing and Control*, 104, 107119. (DOI: 10.1016/j.bspc.2025.107119)
+- Chen, M. 等. (2025). "A three-stage pipeline with ConvLSTM-MA for ECG delineation." *Biomedical Signal Processing and Control*, 104, 107119.（DOI: 10.1016/j.bspc.2025.107119）
 
-**Advantages.**
-- LSTM's memory mechanism captures heart-rate-dependent changes in wave morphology.
-- ConvLSTM naturally combines local feature extraction with sequential modeling.
-- BiLSTM (bidirectional) can incorporate both past and future context for each time step.
+**优点。**
+- LSTM的记忆机制捕获心率依赖的波形形态变化。
+- ConvLSTM天然结合了局部特征提取与序列建模。
+- BiLSTM（双向）能为每个时间步纳入过去和未来上下文。
 
-**Limitations.**
-- Training is slower than CNNs due to sequential processing.
-- LSTM can struggle with very long sequences without attention mechanisms.
-- The three-stage pipeline (preprocessing + ConvLSTM + postprocessing) introduces multiple hyperparameter dependencies.
+**局限性。**
+- 由于序列处理，训练比CNN慢。
+- LSTM在没有注意力机制的情况下可能难以处理非常长的序列。
+- 三阶段流水线（预处理+ConvLSTM+后处理）引入多个超参数依赖。
 
-**Typical performance.** The ConvLSTM-MA method reports ~91% F1-score for P-wave segmentation on QTDB, improving over unsupervised methods (~75-79%) and the prior ConvLSTM-SA model (~89%).
+**典型性能。** ConvLSTM-MA方法报告QTDB上P波分割约91% F1分数，优于无监督方法（约75-79%）和先前的ConvLSTM-SA模型（约89%）。
 
-### 5.3 Transformer Architectures
+### 5.3 Transformer架构
 
-**How they work.** Transformer models, originally developed for natural language processing, have been adapted to ECG time-series through tokenization of the raw signal. The self-attention mechanism computes pairwise relationships between all time steps, enabling the model to learn long-range dependencies across the entire cardiac cycle without the sequential bottleneck of RNNs. Key adaptation strategies: (a) patch-based tokenization (splitting the ECG into non-overlapping patches analogous to ViT image patches); (b) learnable positional encodings to preserve temporal order; (c) decoder-only architectures (GPT-style) that can be pre-trained on large unlabeled ECG corpora via next-token prediction.
+**工作原理。** Transformer模型最初为自然语言处理开发，已通过对原始信号进行分词被adapt到ECG时间序列。自注意力机制计算所有时间步之间的成对关系，使模型能够学习整个心动周期的长程依赖关系，而无需RNN的顺序瓶颈。关键适应策略：(a) 基于补丁的分词（将ECG分割为类似ViT图像补丁的非重叠补丁）；(b) 可学习位置编码以保留时间顺序；(c) 仅解码器架构（GPT风格），可通过下一token预测在大型无标注ECG语料库上进行预训练。
 
-**Key references.**
-- Dinh, H.Q. et al. (2024). "ECG-PT: An ECG pre-trained Transformer for ECG signal classification and generation." *arXiv:2407.20775*.
-- Plaza-Seco, R. et al. (2025). "I-BEAT: Interpretable Beat Analysis Transformer for ECG delineation." *IEEE EMBC 2025*.
+**关键文献。**
+- Dinh, H.Q. 等. (2024). "ECG-PT: An ECG pre-trained Transformer for ECG signal classification and generation." *arXiv:2407.20775*.
+- Plaza-Seco, R. 等. (2025). "I-BEAT: Interpretable Beat Analysis Transformer for ECG delineation." *IEEE EMBC 2025*.
 
-**Advantages.**
-- Self-attention captures global context: a P-wave decision can attend to the QRS complex 300 ms later.
-- Pre-training on large unlabeled datasets (42M+ tokens) via self-supervised learning reduces the need for labeled data.
-- Multi-head attention can learn to specialize in different waveform components without explicit supervision.
+**优点。**
+- 自注意力捕获全局上下文：P波决策可以关注300 ms后的QRS波群。
+- 通过自监督学习在大型无标注数据集（4200万+ token）上预训练减少对标注数据的需求。
+- 多头注意力可以在没有显式监督的情况下学习专攻不同波形成分。
 
-**Limitations.**
-- Quadratic complexity in sequence length (mitigated by patch-based tokenization).
-- Large parameter counts require substantial training data and compute.
-- A claim that individual attention heads learn P-wave-specific responses was refuted (3-0 vote) -- the evidence for interpretable attention in ECG Transformers is currently weak.
-- Transfer learning from pre-trained models to specific delineation tasks is an active area with mixed results.
+**局限性。**
+- 序列长度的二次复杂度（通过基于补丁的分词缓解）。
+- 大量参数需要大量训练数据和计算资源。
+- 关于各注意力头学习P波特定响应的声明被驳斥（3-0投票）——ECG Transformer中可解释注意力的证据目前薄弱。
+- 从预训练模型迁移学习到特定波形识别任务是一个结果参差不齐的活跃领域。
 
-**Typical performance.** I-BEAT achieves an F1-score of 94.59% for P-wave detection on manually annotated QTDB and LUDB datasets with strict patient separation. This is the best reported deep learning result on combined QTDB+LUDB with rigorous evaluation.
+**典型性能。** I-BEAT在手动标注的QTDB和LUDB数据集上，采用严格患者分离，P波检测F1达到94.59%。这是组合QTDB+LUDB上采用严格评估的最佳报告深度学习结果。
 
-### 5.4 I-BEAT: Interpretable Beat Analysis Transformer
+### 5.4 I-BEAT：可解释心搏分析Transformer
 
-The I-BEAT model (Plaza-Seco et al., EMBC 2025, peer-reviewed) is notable for achieving competitive performance with strong evaluation methodology:
+I-BEAT模型（Plaza-Seco等，EMBC 2025，同行评审）以强大的评估方法学实现竞争性能而著称：
 
-- **Strict patient separation:** No patient appears in both training and test sets, preventing the data leakage that inflates many reported ECG delineation results.
-- **Manually annotated datasets:** Uses expert-reviewed annotations on QTDB and LUDB, not automated labels.
-- **Combined database evaluation:** Reports a single F1-score across both databases rather than cherry-picking the best-performing database.
+- **严格患者分离：** 没有患者同时出现在训练集和测试集中，防止了膨胀许多报告ECG波形识别结果的数据泄漏。
+- **手动标注数据集：** 使用QTDB和LUDB上经专家审核的标注，而非自动标签。
+- **组合数据库评估：** 报告跨两个数据库的单一F1分数，而非挑选最佳表现数据库。
 
-**Reported F1-scores (QTDB + LUDB, strict patient separation):**
+**报告的F1分数（QTDB + LUDB，严格患者分离）：**
 
-| Wave | F1 Score |
+| 波形 | F1 分数 |
 |------|----------|
 | P    | 94.59%   |
 | QRS  | 98.76%   |
 | T    | 97.53%   |
 
-**Verified status.** Confirmed by unanimous 3-0 vote. The source is an EMBC 2025 peer-reviewed conference paper. The numbers have been independently corroborated through multiple academic search results and a companion journal paper (Biomedical Signal Processing and Control, 2025) by the same group reporting concordant P-wave F1 in the 93-94% range using an autoencoder-based method. Confidence: **high**, though with the single-source caveat for a 2025 publication that has not yet had time for extensive independent replication.
+**验证状态。** 由一致的3-0投票确认。来源是EMBC 2025同行评审会议论文。这些数字已通过多个学术搜索结果和同一团队使用自编码器方法在《Biomedical Signal Processing and Control》（2025）上报告一致性P波F1（93-94%范围）的姊妹期刊论文得到独立佐证。置信度：**高**，但对于2025年的出版物，尚无充足时间进行广泛的独立复现，此为单一来源的注意事项。
 
 ---
 
-## 6. Hybrid Methods
+## 6. 混合方法
 
-### 6.1 HSMM + Template Matching Fallback (This Project)
+### 6.1 HSMM + 模板匹配后备（本项目）
 
-**Architecture.** This project's `PWaveExtractor` implements a multi-stage hybrid approach:
+**架构。** 本项目的 `PWaveExtractor` 实现了多阶段混合方法：
 
-1. **Stage 1:** 9-state HSMM segments the full cardiac cycle (ISO, P, PR, Q, R, S, ST, T, TP).
-2. **Stage 2 (Focused HSMM):** A 3-state HSMM (ISO_before, P, PR_after) is applied within a window around the Stage 1 P-wave boundaries, with boundary-guided GMM initialization and HR-adaptive duration priors.
-3. **Boundary refinement:** Derivative zero-crossing analysis walks outward from HSMM-estimated boundaries to identify the precise onset/offset where the slope returns to baseline.
-4. **Template matching fallback:** When the HSMM finds no clear P-wave, an automatically accumulated template pool (built from high-confidence P-waves) is cross-correlated against the P region. If correlation exceeds 0.4, the template match is accepted.
-5. **Absence detection:** Distinguishes true P-wave absence (AFib flat baseline) from detection failure using P-region vs. isoelectric region standard deviation ratio.
-6. **Morphology classification:** Classifies detected P-waves as normal, biphasic, peaked, inverted, absent, low-amplitude, or undetermined using peak count, net area sign, and amplitude thresholds.
-7. **Cross-beat consistency:** 5-beat sliding median on P-wave durations flags outliers deviating more than 3 sigma from local smoothed values.
+1. **第一阶段：** 9状态HSMM分割整个心动周期（ISO、P、PR、Q、R、S、ST、T、TP）。
+2. **第二阶段（聚焦HSMM）：** 在第一阶段P波边界周围的窗口内应用三状态HSMM（ISO_before、P、PR_after），使用边界引导的GMM初始化和心率自适应时长先验。
+3. **边界精细化：** 导数零交叉分析从HSMM估计的边界向外遍历，识别斜率回到基线的精确起始点/终止点。
+4. **模板匹配后备：** 当HSMM找不到清晰P波时，将自动累积的模板池（由高置信度P波构建）与P区域进行互相关。如果相关性超过0.4，接受模板匹配。
+5. **缺失检测：** 使用P区域与等电位区域标准差之比区分真实P波缺失（房颤平坦基线）与检测失败。
+6. **形态分类：** 使用峰值计数、净面积符号和幅度阈值将检测到的P波分类为正常、双相、尖峰、倒置、缺失、低幅度或未确定。
+7. **跨心搏一致性：** P波时长的5心搏滑动中位数标记偏离局部平滑值超过3个标准差的外点。
 
-**Key innovations (this project):**
-- **Multi-dimensional confidence:** Combines SNR (dB), symmetry (rising/falling slope ratio), consistency (Pearson correlation with template pool), and duration deviation (Gaussian penalty from HR-expected duration) into a single 0-1 score.
-- **Boundary-guided GMM initialization:** Uses Stage 1 boundaries to seed the 3-state HSMM's GMM parameters, replacing the naive equal-thirds split that performs poorly when the P-wave position is uncertain.
-- **Automatic template accumulation:** No user interaction required; the template pool builds from the first few high-confidence detections.
+**本项目关键创新：**
+- **多维置信度：** 将SNR（dB）、对称性（上升/下降斜率比）、一致性（与模板池的Pearson相关性）和时长偏差（相对于心率预期时长的高斯惩罚）组合为单一的0-1分数。
+- **边界引导GMM初始化：** 使用第一阶段边界为三状态HSMM的GMM参数提供种子，替代在P波位置不确定时表现不佳的朴素等分初始方法。
+- **自动模板累积：** 无需用户交互；模板池从最初几个高置信度检测自动构建。
 
-### 6.2 Synthetic Data + Deep Learning
+### 6.2 合成数据 + 深度学习
 
-**How they work.** These methods generate synthetic ECG traces by probabilistically assembling fundamental segments (P, QRS, T waves, pause segments) from real ECG pools using expert domain knowledge rules. The synthetic generation can simulate various pathologies (ventricular tachycardia, AFib, AV blocks, sinus arrest, ST elevation/depression) by manipulating segment ordering, timing, and morphology. A deep learning model (U-Net, Transformer, or ConvLSTM) is then trained on the synthetic data, optionally augmented with real samples.
+**工作原理。** 这些方法通过使用专家领域知识规则从真实ECG池中概率性地组装基本片段（P、QRS、T波、间期片段）来生成合成ECG轨迹。合成生成可通过操纵片段排序、时序和形态来模拟各种病理（室性心动过速、房颤、房室传导阻滞、窦性停搏、ST段抬高/压低）。然后在合成数据上训练深度学习模型（U-Net、Transformer或ConvLSTM），可选择性地用真实样本增强。
 
-**Key references.**
-- Jimenez-Perez, G. et al. (2024). "Synthetic ECG generation for improved deep learning-based ECG delineation." *Frontiers in Cardiovascular Medicine*, 11, 1341786. (DOI: 10.3389/fcvm.2024.1341786)
+**关键文献。**
+- Jimenez-Perez, G. 等. (2024). "Synthetic ECG generation for improved deep learning-based ECG delineation." *Frontiers in Cardiovascular Medicine*, 11, 1341786.（DOI: 10.3389/fcvm.2024.1341786）
 
-**Advantages.**
-- Addresses the labeled data scarcity problem that limits deep learning approaches.
-- Can generate rare pathology examples that are underrepresented in public databases.
-- Domain knowledge is encoded in the generation rules, providing a form of physiological regularization.
+**优点。**
+- 解决限制深度学习方法的标注数据稀缺问题。
+- 可生成公共数据库中代表性不足的罕见病理示例。
+- 领域知识被编码在生成规则中，提供一种生理正则化形式。
 
-**Limitations.**
-- A claim that synthetic-only models outperform real-data-only models was refuted (3-0 vote) -- the reviewed evidence suggests synthetic data augmentation helps but does not replace real data.
-- The generation rules must be carefully designed to produce physiologically realistic traces.
-- Generated P-waves may lack the subtle morphological features that distinguish pathological from benign variants.
+**局限性。**
+- "纯合成模型优于纯真实数据模型"的声明被驳斥（3-0投票）——文献证据表明合成数据增强有帮助但**不能替代**真实数据。
+- 生成规则必须精心设计以产生生理上真实的轨迹。
+- 生成的P波可能缺乏区分病理与良性变异所需的微妙形态特征。
 
-**Typical performance.** The aggregated F1-score across three databases (QT, LU, Zhejiang) with synthetic augmentation is reported in the paper, though a specific performance claim for this metric was refuted (1-2 vote, insufficient corroborating evidence).
+**典型性能。** 论文中报告了合成增强下三个数据库（QT、LU、Zhejiang）的聚合F1分数，但该度量的具体性能声明在验证中被驳斥（1-2投票，佐证不足）。
 
-### 6.3 Three-Stage Pipelines (Preprocessing + Deep Model + Postprocessing)
+### 6.3 三阶段流水线（预处理 + 深度模型 + 后处理）
 
-**How they work.** These methods decompose ECG delineation into three sequential stages:
+**工作原理。** 这些方法将ECG波形识别分解为三个顺序阶段：
 
-1. **Shallow preprocessing:** Bandpass filtering, baseline wander removal, QRS detection to define analysis windows.
-2. **Deep model:** ConvLSTM, CNN, or Transformer performs the core waveform classification.
-3. **Physiology-driven postprocessing:** Enforces realistic wave ordering (P before QRS before T), duration constraints, and inter-beat consistency.
+1. **浅层预处理：** 带通滤波、基线漂移去除、QRS检测以定义分析窗口。
+2. **深度模型：** ConvLSTM、CNN或Transformer执行核心波形分类。
+3. **生理驱动的后处理：** 强制执行现实的波形顺序（P在QRS之前，QRS在T之前）、时长约束和心搏间一致性。
 
-**Key references.**
-- Chen, M. et al. (2025). "Three-stage pipeline with ConvLSTM-MA for ECG delineation." *Biomedical Signal Processing and Control*.
+**关键文献。**
+- Chen, M. 等. (2025). "Three-stage pipeline with ConvLSTM-MA for ECG delineation." *Biomedical Signal Processing and Control*.
 
-**Advantages.**
-- Isolates the deep model from low-level signal processing concerns (preprocessing) and physiological implausibility (postprocessing).
-- Postprocessing rules can be deterministic and auditable, improving clinical trustworthiness.
-- Modular design allows independent improvement of each stage.
+**优点。**
+- 将深度模型与低层信号处理问题（预处理）和生理不可信性（后处理）隔离开来。
+- 后处理规则可以是确定性的和可审计的，提高临床可信度。
+- 模块化设计允许独立改进每个阶段。
 
-**Limitations.**
-- Multiple stages introduce cascading errors: a QRS detection failure in preprocessing prevents the deep model from ever seeing the P-wave.
-- Hyperparameters must be tuned across all three stages jointly.
-- Less elegant than end-to-end approaches; may sacrifice performance optimization opportunities.
+**局限性。**
+- 多阶段引入级联错误：预处理中的QRS检测失败阻止深度模型看到P波。
+- 超参数必须在所有三个阶段联合调整。
+- 不如端到端方法优雅；可能牺牲性能优化机会。
 
 ---
 
-## 7. Time-Frequency Analysis Methods
+## 7. 时频分析方法
 
-### 7.1 Short-Time Fourier Transform (STFT) and Spectrograms
+### 7.1 短时傅里叶变换（STFT）与频谱图
 
-**How they work.** The STFT computes the frequency content of the ECG in sliding windows, producing a time-frequency representation (spectrogram). P-waves appear as transient energy concentrations in the 5-15 Hz band, temporally preceding the higher-energy QRS complex. Detection proceeds by identifying energy peaks in the P-wave frequency band within the expected temporal window.
+**工作原理。** STFT在滑动窗口中计算ECG的频率内容，产生时频表示（频谱图）。P波表现为5-15 Hz频带内的暂态能量集中，在时间上领先于更高能量的QRS波群。检测通过在预期时间窗口内识别P波频带中的能量峰值来进行。
 
-**Advantages:** Well-understood mathematical foundation; efficient FFT-based implementations.
-**Limitations:** Fixed time-frequency resolution trade-off (narrow windows give good time resolution but poor frequency resolution, and vice versa); P-wave energy is often too weak to appear distinctly above the noise floor.
+**优点：** 数学基础成熟；基于FFT的高效实现。
+**局限性：** 固定的时频分辨率权衡（窄窗口提供良好时间分辨率但频率分辨率差，反之亦然）；P波能量通常太弱，无法在噪声基底上明显出现。
 
-### 7.2 Wigner-Ville Distribution and Choi-Williams Distribution
+### 7.2 Wigner-Ville分布与Choi-Williams分布
 
-**How they work.** These are Cohen's class time-frequency distributions that provide higher resolution than the STFT. The Wigner-Ville distribution (WVD) offers the best theoretical time-frequency resolution but suffers from cross-term interference. The Choi-Williams distribution (CWD) suppresses cross-terms at the cost of slightly reduced resolution, making it more suitable for multi-component signals like the ECG.
+**工作原理。** 这些是Cohen类的时频分布，提供比STFT更高的分辨率。Wigner-Ville分布（WVD）提供最佳理论时频分辨率，但受到交叉项干扰。Choi-Williams分布（CWD）以略微降低分辨率为代价抑制交叉项，使其更适合ECG等多分量信号。
 
-**Key references.**
+**关键文献。**
 - Cohen, L. (1995). *Time-Frequency Analysis*. Prentice Hall.
 
-**Advantages:** Higher time-frequency resolution than STFT; can distinguish P-wave from overlapping frequency components.
-**Limitations:** Cross-term interference (WVD) or resolution loss (CWD); computationally more expensive than STFT; rarely used in practice for P-wave detection compared to wavelet or phasor methods.
+**优点：** 比STFT更高的时频分辨率；可区分P波与重叠的频率成分。
+**局限性：** 交叉项干扰（WVD）或分辨率损失（CWD）；计算成本高于STFT；与小波或相量方法相比，实践中很少用于P波检测。
 
 ---
 
-## 8. Comparative Performance Summary
+## 8. 性能对比总结
 
-| Method | Database | Se | PP/F1 | Pathology-Aware | Interpretable |
-|--------|----------|-----|-------|-----------------|---------------|
-| Wavelet (Martinez 2004) | QTDB | 98.87% | 91.04% PP | No | Medium |
-| Phasor physiological (Saclova 2022) | QTDB | 99.23% | 99.12% PP | Yes | High |
-| Phasor physiological (Saclova 2022) | MITDB | 98.56% | 99.82% PP | Yes | High |
-| **Phasor pathological (Saclova 2022)** | **MITDB path** | **96.40%** | **91.56% PP** | **Yes** | **High** |
-| Phasor pathological (Saclova 2022) | BUT PDB | 93.07% | 88.60% PP | Yes | High |
-| BI-HSMM (Liu 2022) | QTDB | -- | **98.37% F1** | No | Medium |
-| I-BEAT (Plaza-Seco 2025) | QTDB+LUDB | -- | 94.59% F1 | Yes | Low |
-| ConvLSTM-MA (Chen 2025) | QTDB | -- | ~91% F1 | No | Low |
-| U-Net 3+ (Park 2025) | LUDB | -- | 85-92% mIoU | No | Low |
-| Threshold/Laguna | MITDB path | ~76% | ~56% PP | No | High |
-| This project (HSMM+Template) | Internal | -- | -- | Yes | High |
+| 方法 | 数据库 | Se | PP/F1 | 病理感知 | 可解释性 |
+|------|--------|-----|-------|----------|----------|
+| 小波 (Martinez 2004) | QTDB | 98.87% | 91.04% PP | 否 | 中等 |
+| 相量 生理性 (Saclova 2022) | QTDB | 99.23% | 99.12% PP | 是 | 高 |
+| 相量 生理性 (Saclova 2022) | MITDB | 98.56% | 99.82% PP | 是 | 高 |
+| **相量 病理性 (Saclova 2022)** | **MITDB病理** | **96.40%** | **91.56% PP** | **是** | **高** |
+| 相量 病理性 (Saclova 2022) | BUT PDB | 93.07% | 88.60% PP | 是 | 高 |
+| BI-HSMM (Liu 2022) | QTDB | -- | **98.37% F1** | 否 | 中等 |
+| I-BEAT (Plaza-Seco 2025) | QTDB+LUDB | -- | 94.59% F1 | 是 | 低 |
+| ConvLSTM-MA (Chen 2025) | QTDB | -- | ~91% F1 | 否 | 低 |
+| U-Net 3+ (Park 2025) | LUDB | -- | 85-92% mIoU | 否 | 低 |
+| 阈值/Laguna | MITDB病理 | ~76% | ~56% PP | 否 | 高 |
+| 本项目 (HSMM+模板) | 内部 | -- | -- | 是 | 高 |
 
-**Key insight:** The phasor transform method achieves the best balance of interpretability, pathological robustness, and validated performance. Deep learning methods (I-BEAT) achieve competitive results with the advantage of end-to-end learning but reduced interpretability. The BI-HSMM reports the highest single-database F1 but raises methodological questions.
-
----
-
-## 9. Open Questions
-
-1. **Why does BI-HSMM achieve higher P-wave F1 than QRS F1 (98.37% vs 97.60%)?** This inverts the universal difficulty hierarchy (QRS is always easier to detect than P-wave). Possible explanations: different tolerance windows for correct detection, QRS annotation ambiguity at onset/offset, or an artifact of the QTDB annotation protocol. Independent replication is needed.
-
-2. **Can the pathology-aware decision rules from the phasor method be integrated into deep learning architectures?** The Saclova method's explicit AF/PVC gating is highly effective but hand-crafted. A hybrid that uses deep learning for feature extraction with explicit physiological gating could combine the strengths of both paradigms.
-
-3. **How well do current P-wave detectors generalize across lead configurations?** Most methods are validated on 1-2 lead configurations (primarily Lead II). P-wave morphology varies substantially across leads -- a P-wave that is prominent in Lead II may be isoelectric in Lead I or aVL. Multi-lead methods exist but are underexplored.
-
-4. **What is the clinical minimum viable performance for P-wave detection?** The literature reports F1-scores from 85% to 98% but does not establish what performance level is clinically actionable. A detector with 95% F1 may still produce too many false positives/negatives for atrial fibrillation burden quantification or PR interval measurement in clinical decision support.
+**关键洞察：** 相量变换方法在可解释性、病理鲁棒性和经过验证的性能之间取得了最佳平衡。深度学习方法（I-BEAT）以端到端学习的优势取得竞争性结果，但可解释性降低。BI-HSMM报告最高单数据库F1但引发方法学质疑。
 
 ---
 
-## 10. Sources
+## 9. 开放问题
 
-### Primary (peer-reviewed)
+1. **为什么BI-HSMM的P波F1高于QRS F1（98.37% vs 97.60%）？** 这颠倒了公认的难度层次（QRS总是比P波更容易检测）。可能的解释：正确检测的不同容忍窗口、QRS起始/终止标注模糊性，或QTDB标注协议的伪影。需要进行独立复现。
+
+2. **相量方法的病理感知决策规则能否集成到深度学习架构中？** Saclova方法的显式AF/PVC门控非常有效但是手工设计的。一个使用深度学习进行特征提取并结合显式生理门控的混合方法可以结合两种范式的优势。
+
+3. **当前P波检测器在不同导联配置下的泛化能力如何？** 大多数方法在1-2个导联配置（主要是II导联）上验证。P波形态在不同导联间存在显著变化——在II导联中突出的P波可能在I导联或aVL导联中等电位。多导联方法存在但探索不充分。
+
+4. **P波检测的临床最低可行性能是什么？** 文献报告F1分数从85%到98%，但未建立临床决策支持（房颤负荷量化、PR间期测量、左房扩大筛查）的可操作阈值。即使95% F1的检测器仍可能产生过多假阳性/假阴性。
+
+---
+
+## 10. 参考文献
+
+### 主要文献（同行评审）
 1. Martinez, A., Alcaraz, R., & Rieta, J.J. (2010). "Application of the phasor transform for automatic delineation of single-lead ECG fiducial points." *Physiological Measurement*, 31(11), 1467-1485. DOI: 10.1088/0967-3334/31/11/005
 2. Saclova, L., Nemcova, A., Smisek, R., Vitek, M., & Maršánová, L. (2022). "A pathology-aware P-wave detector based on the phasor transform." *Scientific Reports*, 12, 6576. DOI: 10.1038/s41598-022-10656-4
-3. Saclova, L. (2022). *Advanced Methods for ECG Holter Monitoring Signals Analysis*. Doctoral dissertation, Brno University of Technology. https://theses.cz/id/ifdkfz/
+3. Saclova, L. (2022). *Advanced Methods for ECG Holter Monitoring Signals Analysis*. 博士论文，布尔诺理工大学。https://theses.cz/id/ifdkfz/
 4. Liu, J., Jin, Y., Liu, Y., Li, Z., & Sun, C. (2022). "BI-HSMM: A bidirectional hidden semi-Markov model for ECG signal segmentation." *Computers in Biology and Medicine*, 150, 106147. DOI: 10.1016/j.compbiomed.2022.106147
-5. Plaza-Seco, R. et al. (2025). "I-BEAT: Interpretable Beat Analysis Transformer for ECG delineation." *IEEE EMBC 2025*. https://documentsdelivered.com/source/069/137/069137344.php
+5. Plaza-Seco, R. 等. (2025). "I-BEAT: Interpretable Beat Analysis Transformer for ECG delineation." *IEEE EMBC 2025*. https://documentsdelivered.com/source/069/137/069137344.php
 6. Censi, F., Calcagnini, G., Ricci, C., Ricci, R.P., & Santini, M. (2007). "P-wave morphology assessment by a Gaussian functions-based model in atrial fibrillation patients." *Journal of Electrocardiology*, 40(6), S69. DOI: 10.1016/j.jelectrocard.2007.08.019
 
-### Secondary and background
+### 次要文献与背景资料
 7. Martinez, J.P., Almeida, R., Olmos, S., Rocha, A.P., & Laguna, P. (2004). "A wavelet-based ECG delineator: evaluation on standard databases." *IEEE Transactions on Biomedical Engineering*, 51(4), 570-581.
 8. Pan, J. & Tompkins, W.J. (1985). "A Real-Time QRS Detection Algorithm." *IEEE Transactions on Biomedical Engineering*, 32(3), 230-236.
 9. Laguna, P., Jane, R., & Caminal, P. (1994). "Automatic detection of wave boundaries in multilead ECG signals: Validation with the CSE database." *Computers and Biomedical Research*, 27(1), 45-60.
 10. Coast, D.A., Stern, R.M., Cano, G.G., & Briller, S.A. (1990). "An approach to cardiac arrhythmia analysis using hidden Markov models." *IEEE Transactions on Biomedical Engineering*, 37(9), 826-836.
 11. Hughes, N.P., Tarassenko, L., & Roberts, S.J. (2004). "Markov models for automated ECG interval analysis." *NeurIPS*, 16.
 12. Maršánová, L., Nemcova, A., Smisek, R., Vitek, M., & Saclova, L. (2019). "Advanced P wave detection in ECG signals." *Scientific Reports*, 9, 10490.
-13. Jimenez-Perez, G. et al. (2024). "Synthetic ECG generation for improved deep learning-based ECG delineation." *Frontiers in Cardiovascular Medicine*, 11, 1341786.
-14. Chen, M. et al. (2025). "Three-stage pipeline with ConvLSTM-MA for ECG delineation." *Biomedical Signal Processing and Control*, 104, 107119.
-15. Park, J. et al. (2025). "Comparative Analysis of CNN and Transformer Models for ECG Delineation." *Proceedings of Machine Learning Research*, 287.
+13. Jimenez-Perez, G. 等. (2024). "Synthetic ECG generation for improved deep learning-based ECG delineation." *Frontiers in Cardiovascular Medicine*, 11, 1341786.
+14. Chen, M. 等. (2025). "Three-stage pipeline with ConvLSTM-MA for ECG delineation." *Biomedical Signal Processing and Control*, 104, 107119.
+15. Park, J. 等. (2025). "Comparative Analysis of CNN and Transformer Models for ECG Delineation." *Proceedings of Machine Learning Research*, 287.
 
-### Project-internal documentation
-16. This project: `ecg_waveform_extraction/hsmm/` -- 9-state HSMM implementation with GMM observations, truncated Gaussian durations, and vectorized Viterbi decoding.
-17. This project: `ecg_waveform_extraction/extraction/p_wave_extractor.py` -- Multi-stage P-wave extractor combining focused HSMM, template matching fallback, derivative boundary refinement, absence detection, and morphology classification.
+### 项目内部文档
+16. 本项目：`ecg_waveform_extraction/hsmm/`——具有GMM观测、截断高斯时长和向量化Viterbi解码的9状态HSMM实现。
+17. 本项目：`ecg_waveform_extraction/extraction/p_wave_extractor.py`——结合聚焦HSMM、模板匹配后备、导数边界精细化、缺失检测和形态分类的多阶段P波提取器。
 
 ---
 
-## 11. Caveats and Limitations of This Survey
+## 11. 本综述的注意事项与局限性
 
-1. **Publication bias toward positive results.** Methods reporting poor P-wave detection performance are rarely published, inflating the apparent state of the art.
-2. **Database heterogeneity.** QTDB, MITDB, LUDB, and BUT PDB use different annotation protocols, lead configurations, and patient populations. Cross-database comparisons should be interpreted cautiously.
-3. **Tolerance window variability.** Some papers count a P-wave as "detected" if the detected onset is within 10 ms of the annotation; others use 20 ms, 50 ms, or a fraction of the RR interval. This makes direct F1 comparisons unreliable across papers.
-4. **Verification methodology.** The 7 confirmed claims in this survey were verified through multi-query adversarial web search and source document inspection. Unconfirmed claims are identified as such. Claims with 0-3 or 1-2 verification votes are listed as refuted.
-5. **Time sensitivity.** As of July 2026, the methods from 2022-2025 (BI-HSMM, I-BEAT, ConvLSTM-MA, CED-Net) represent the current frontier. New methods published in 2025-2026 may not yet appear in this survey.
-6. **This project's bias.** The survey gives disproportionate attention to HSMM-based methods due to this project's implementation focus. Other method families (e.g., wavelet, classical derivative) receive briefer treatment in proportion to the verified claims.
+1. **对正面结果的发表偏倚。** 报告P波检测性能差的方法很少被发表，膨胀了表面上的技术水平。
+2. **数据库异质性。** QTDB、MITDB、LUDB和BUT PDB使用不同的标注协议、导联配置和患者人群。跨数据库比较应谨慎解释。
+3. **容忍窗口变异性。** 有些论文将检测到的起始点在标注10 ms内算作"检测到"；其他论文使用20 ms、50 ms或RR间期的一部分。这使得不同论文间的直接F1比较不可靠。
+4. **验证方法学。** 本综述中的7条确认声明通过多查询对抗性网络搜索和源文献检查进行验证。未经确认的声明已如此标识。获得0-3或1-2验证投票的声明列为被驳斥。
+5. **时效性。** 截至2026年7月，2022-2025年的方法（BI-HSMM、I-BEAT、ConvLSTM-MA、CED-Net）代表当前前沿。2025-2026年新发表的方法可能尚未出现在本综述中。
+6. **本项目的偏倚。** 由于本项目的实现重点，综述对基于HSMM的方法给予了不成比例的关注。其他方法族（如小波、经典导数方法）按经验证声明的比例获得较简略的处理。
