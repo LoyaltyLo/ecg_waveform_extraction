@@ -568,8 +568,9 @@ class TimeFrequencyPWaveDetector:
 C_TEMPLATE = "#2196F3"   # blue
 C_PHASOR   = "#FF9800"   # orange
 C_CWT      = "#4CAF50"   # green
-C_ECG      = "#212121"
-C_P_HIGHLIGHT = "#E3F2FD"  # light blue for P region fill
+C_ECG       = "#212121"
+C_P_HIGHLIGHT = "#E3F2FD"
+C_QRS       = "#E53935"   # red for QRS
 
 METHOD_STYLES = {
     "template": dict(color=C_TEMPLATE, lw=2.5, ls="-",  label="HSMM+Template"),
@@ -621,6 +622,29 @@ def plot_overview(ecg, beats, results_template, results_phasor, results_cwt,
         # ECG trace
         ax.plot(t_plot, e_plot, color=C_ECG, linewidth=0.5, alpha=0.85, zorder=1)
 
+        # ---- QRS region highlighting (same for all methods) ----
+        for b in beats:
+            q_on = getattr(b, "q_onset", -1)
+            s_off = getattr(b, "s_offset", -1)
+            r_pk = getattr(b, "r_peak", -1)
+            if q_on < 0 or s_off <= q_on:
+                continue
+            if q_on >= n_plot:
+                break
+            s_clip = min(s_off, n_plot - 1)
+            if s_clip <= q_on:
+                continue
+            ax.fill_between(
+                t_plot[q_on : s_clip + 1],
+                e_plot[q_on : s_clip + 1],
+                alpha=0.12, color=C_QRS, linewidth=0, zorder=2,
+            )
+            # R peak marker
+            if 0 <= r_pk < n_plot:
+                ax.plot(r_pk / DEFAULT_FS, e_plot[r_pk], "v",
+                        color=C_QRS, markersize=5, alpha=0.8, zorder=5)
+
+        # ---- P-wave method-specific highlighting ----
         style = METHOD_STYLES[method_key]
         for r in results:
             if r is None:
@@ -668,8 +692,9 @@ def plot_overview(ecg, beats, results_template, results_phasor, results_cwt,
         Patch(facecolor=C_TEMPLATE, alpha=0.3, label="M1: HSMM+Template"),
         Patch(facecolor=C_PHASOR, alpha=0.3, label="M2: HSMM+Phasor"),
         Patch(facecolor=C_CWT, alpha=0.3, label="M3: HSMM+CWT"),
+        Patch(facecolor=C_QRS, alpha=0.2, label="QRS (HSMM Stage 1)"),
     ]
-    fig.legend(handles=legend_elements, loc="lower center", ncol=3,
+    fig.legend(handles=legend_elements, loc="lower center", ncol=4,
                fontsize=10, framealpha=0.9)
 
     fig.tight_layout(rect=[0, 0.05, 1, 0.96])
@@ -680,38 +705,48 @@ def plot_overview(ecg, beats, results_template, results_phasor, results_cwt,
 
 def plot_beat_detail(ecg, beat, pw_t, pw_p, pw_c, rec_name,
                      save_path, dpi=200):
-    """Zoomed single-beat plot comparing all three methods."""
-    T = len(ecg)
+    """Zoomed single-beat plot comparing all three methods.
 
-    # Window: P region + margins
-    margin = int(0.15 * DEFAULT_FS)
+    Shows P-wave (3 methods) + QRS (HSMM Stage 1) + T-wave boundaries.
+    """
+    T = len(ecg)
+    fs = DEFAULT_FS
+
+    # ---- Window: P onset → T offset + margins ----
+    margin = int(0.15 * fs)
+    # P region start
     if beat.p_onset > 0:
-        centre = (beat.p_onset + beat.p_offset) // 2
+        p_centre = (beat.p_onset + beat.p_offset) // 2
     else:
-        centre = beat.q_onset - int(0.16 * DEFAULT_FS)
-    ws = max(0, centre - int(0.30 * DEFAULT_FS))
-    we = min(T - 1, beat.q_onset + int(0.05 * DEFAULT_FS) if beat.q_onset > 0 else centre + int(0.35 * DEFAULT_FS))
+        p_centre = beat.q_onset - int(0.16 * fs)
+    ws = max(0, p_centre - int(0.30 * fs))
+    # Extend to include QRS + T
+    if beat.t_offset > 0:
+        we = min(T - 1, beat.t_offset + margin)
+    elif beat.s_offset > 0:
+        we = min(T - 1, beat.s_offset + int(0.40 * fs))
+    else:
+        we = min(T - 1, beat.r_peak + int(0.50 * fs) if beat.r_peak > 0 else p_centre + int(0.60 * fs))
     if we - ws < 20:
         return
 
-    t_win = np.arange(ws, we + 1) / DEFAULT_FS
+    t_win = np.arange(ws, we + 1) / fs
     e_win = ecg[ws : we + 1]
 
     fig, (ax_ecg, ax_phase, ax_cwt) = plt.subplots(3, 1, figsize=(14, 10),
                                                      gridspec_kw={"height_ratios": [2, 1, 1]})
-    fig.suptitle(f"{rec_name} — Beat {beat.beat_id}  Three-Method P-Wave Comparison",
+    fig.suptitle(f"{rec_name} — Beat {beat.beat_id}  Three-Method P-Wave + QRS Comparison",
                  fontsize=13, fontweight="bold")
 
-    # ---- Top: ECG with all three methods overlaid ----
+    # ---- Top: ECG with P-wave (3 methods) + QRS + T-wave ----
     ax_ecg.plot(t_win, e_win, color=C_ECG, linewidth=0.9, zorder=1)
     ax_ecg.set_ylabel("Amplitude (norm)", fontsize=9)
-    ax_ecg.set_title("ECG with P-Wave Boundaries", fontsize=11, fontweight="bold")
+    ax_ecg.set_title("ECG: P-Wave (3 methods) + QRS + T-Wave (HSMM Stage 1)", fontsize=11, fontweight="bold")
     ax_ecg.grid(True, alpha=0.12)
 
     y_min, y_max = e_win.min(), e_win.max()
-    y_range = max(y_max - y_min, 0.1)
-    y_band_bottom = y_min - 0.08 * y_range
 
+    # ---- P-wave: three methods ----
     for method_key, pw, style in [
         ("template", pw_t, METHOD_STYLES["template"]),
         ("phasor", pw_p, METHOD_STYLES["phasor"]),
@@ -723,27 +758,78 @@ def plot_beat_detail(ecg, beat, pw_t, pw_p, pw_c, rec_name,
             if 0 <= on < len(e_win) and off < len(e_win) and off > on:
                 ax_ecg.fill_between(
                     t_win[on : off + 1], e_win[on : off + 1],
-                    alpha=0.20, color=style["color"], linewidth=0,
+                    alpha=0.18, color=style["color"], linewidth=0,
                 )
                 ax_ecg.axvline(t_win[on], color=style["color"],
-                               ls=style["ls"], lw=style["lw"], alpha=0.9)
+                               ls=style["ls"], lw=style["lw"], alpha=0.85)
                 ax_ecg.axvline(t_win[off], color=style["color"],
-                               ls=style["ls"], lw=style["lw"], alpha=0.9)
+                               ls=style["ls"], lw=style["lw"], alpha=0.85)
 
-    # QRS onset marker
-    if beat.q_onset > 0 and ws <= beat.q_onset <= we:
-        ax_ecg.axvline(beat.q_onset / DEFAULT_FS, color="red", ls=":", lw=1.2, alpha=0.6)
-        ax_ecg.annotate("QRS on", (beat.q_onset / DEFAULT_FS, y_max),
-                        textcoords="offset points", xytext=(4, 4),
-                        fontsize=7, color="red", ha="left")
+    # ---- QRS region ----
+    if beat.q_onset > 0 and beat.s_offset > 0:
+        q_rel = beat.q_onset - ws
+        s_rel = beat.s_offset - ws
+        if 0 <= q_rel < len(e_win) and s_rel < len(e_win) and s_rel > q_rel:
+            ax_ecg.fill_between(
+                t_win[q_rel : s_rel + 1], e_win[q_rel : s_rel + 1],
+                alpha=0.15, color=C_QRS, linewidth=0, zorder=2,
+            )
+            # QRS onset
+            ax_ecg.axvline(t_win[q_rel], color=C_QRS, ls="-", lw=2.0, alpha=0.8)
+            ax_ecg.annotate("Q on", (t_win[q_rel], y_min),
+                            textcoords="offset points", xytext=(-2, -10),
+                            fontsize=7, color=C_QRS, ha="right", fontweight="bold")
+            # QRS offset
+            ax_ecg.axvline(t_win[s_rel], color=C_QRS, ls="-", lw=2.0, alpha=0.8)
+            ax_ecg.annotate("S off", (t_win[s_rel], y_min),
+                            textcoords="offset points", xytext=(2, -10),
+                            fontsize=7, color=C_QRS, ha="left", fontweight="bold")
+
+    # ---- R peak ----
+    if beat.r_peak > 0:
+        r_rel = beat.r_peak - ws
+        if 0 <= r_rel < len(e_win):
+            ax_ecg.plot(t_win[r_rel], e_win[r_rel], "v",
+                        color=C_QRS, markersize=10, markeredgecolor="darkred",
+                        markeredgewidth=1.5, zorder=5)
+            ax_ecg.annotate("R", (t_win[r_rel], e_win[r_rel]),
+                            textcoords="offset points", xytext=(8, 6),
+                            fontsize=8, color=C_QRS, fontweight="bold")
+
+    # ---- T-wave region ----
+    if beat.t_onset > 0 and beat.t_offset > 0:
+        t_on_rel = beat.t_onset - ws
+        t_off_rel = beat.t_offset - ws
+        if 0 <= t_on_rel < len(e_win) and t_off_rel < len(e_win) and t_off_rel > t_on_rel:
+            ax_ecg.fill_between(
+                t_win[t_on_rel : t_off_rel + 1], e_win[t_on_rel : t_off_rel + 1],
+                alpha=0.10, color="#2E7D32", linewidth=0, zorder=1,
+            )
+            ax_ecg.axvline(t_win[t_off_rel], color="#2E7D32", ls=":", lw=1.5, alpha=0.6)
+            ax_ecg.annotate("T off", (t_win[t_off_rel], y_max),
+                            textcoords="offset points", xytext=(2, 4),
+                            fontsize=7, color="#2E7D32", ha="left")
+
+    # QRS duration annotation
+    if beat.q_onset > 0 and beat.s_offset > 0:
+        qrs_dur = (beat.s_offset - beat.q_onset) / fs * 1000.0
+        qrs_mid = (beat.q_onset + beat.s_offset) / 2
+        qrs_mid_rel = qrs_mid - ws
+        if 0 <= qrs_mid_rel < len(e_win):
+            ax_ecg.annotate(f"QRS\n{qrs_dur:.0f}ms",
+                            (t_win[int(qrs_mid_rel)], y_min),
+                            textcoords="offset points", xytext=(0, -20),
+                            fontsize=7, color=C_QRS, ha="center")
 
     ax_ecg.legend(
         handles=[
             Patch(facecolor=C_TEMPLATE, alpha=0.3, label="M1: Template"),
             Patch(facecolor=C_PHASOR, alpha=0.3, label="M2: Phasor"),
             Patch(facecolor=C_CWT, alpha=0.3, label="M3: CWT"),
+            Patch(facecolor=C_QRS, alpha=0.2, label="QRS (HSMM)"),
+            Patch(facecolor="#2E7D32", alpha=0.15, label="T-wave (HSMM)"),
         ],
-        loc="upper right", fontsize=8, framealpha=0.8,
+        loc="upper right", fontsize=7.5, framealpha=0.8, ncol=2,
     )
 
     # ---- Middle: Phasor domain (phase + residual) ----
@@ -813,14 +899,23 @@ def plot_beat_detail(ecg, beat, pw_t, pw_p, pw_c, rec_name,
                      fontweight="bold", color=C_CWT)
 
     # ---- Info table ----
-    lines = [f"Beat {beat.beat_id} — P-Wave Boundaries"]
-    lines.append(f"{'Method':<22} {'Onset(ms)':>10} {'Offset(ms)':>10} {'Dur(ms)':>8} {'Conf':>6}")
+    lines = [f"Beat {beat.beat_id} — Waveform Boundaries"]
+    lines.append("-" * 75)
+    # QRS info
+    qrs_dur_ms = (beat.s_offset - beat.q_onset) / fs * 1000.0 if beat.q_onset > 0 and beat.s_offset > 0 else 0
+    lines.append(f"{'QRS (HSMM):':<22} {'Q on':>8} {beat.q_onset/fs*1000:>8.1f}ms  {'S off':>8} {beat.s_offset/fs*1000:>8.1f}ms  {'Dur':>6} {qrs_dur_ms:>7.1f}ms")
+    lines.append(f"{'R peak:':<22} {beat.r_peak/fs*1000:>8.1f}ms")
+    if beat.t_offset > 0:
+        t_dur = (beat.t_offset - beat.t_onset) / fs * 1000.0 if beat.t_onset > 0 else 0
+        lines.append(f"{'T-wave (HSMM):':<22} {'T off':>8} {beat.t_offset/fs*1000:>8.1f}ms  {'Dur':>6} {t_dur:>7.1f}ms")
+    lines.append("")
+    lines.append(f"{'P-Wave Method':<22} {'Onset(ms)':>10} {'Offset(ms)':>10} {'Dur(ms)':>8} {'Conf':>6}")
     lines.append("-" * 60)
     for label, pw in [("M1: Template", pw_t), ("M2: Phasor", pw_p), ("M3: CWT", pw_c)]:
         if pw is not None and pw.onset_sample >= 0:
             lines.append(
-                f"{label:<22} {pw.onset_sample/DEFAULT_FS*1000:>10.1f} "
-                f"{pw.offset_sample/DEFAULT_FS*1000:>10.1f} "
+                f"{label:<22} {pw.onset_sample/fs*1000:>10.1f} "
+                f"{pw.offset_sample/fs*1000:>10.1f} "
                 f"{pw.duration_ms:>8.1f} {pw.confidence:>6.3f}"
             )
         else:
