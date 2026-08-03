@@ -1067,10 +1067,10 @@ def main():
         print("No data found.")
         return
 
-    print(f"\nFound {len(aecg_files)} aECG files. Processing up to 5 ...")
+    print(f"\nFound {len(aecg_files)} aECG files. Processing up to 50 ...")
 
     all_summaries = []
-    for rec_path in aecg_files[:5]:
+    for rec_path in aecg_files[:50]:
         rec_name = Path(rec_path).stem
         print(f"\n--- {rec_name} ---")
         try:
