@@ -1,7 +1,8 @@
 """Test HSMM pipeline on MIT-BIH real ECG data."""
 
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import os
 import numpy as np
@@ -18,8 +19,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 # ---- Setup ----
-DATA_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/data'
-OUT_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output'
+DATA_DIR = str(Path(__file__).resolve().parent / 'data')
+OUT_DIR = str(Path(__file__).resolve().parent / 'output' / 'mitbih')
 os.makedirs(OUT_DIR, exist_ok=True)
 
 RECORD_PATH = os.path.join(DATA_DIR, '100')

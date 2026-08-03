@@ -3,12 +3,13 @@
 7 sheets: Summary, Per-Record, P-Axis, QRS-Axis, P-Wave, Lead-I, aVR, Voting, Conflicting
 """
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import os, json, numpy as np
 from collections import Counter
 
-OUT_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output_rala_full'
+OUT_DIR = str(Path(__file__).resolve().parent / 'output/rala_full')
 JSON_PATH = os.path.join(OUT_DIR, '_polarity_v2.json')
 XLSX_PATH = os.path.join(OUT_DIR, 'polarity_detection_v2.xlsx')
 

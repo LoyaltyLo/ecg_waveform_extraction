@@ -8,7 +8,8 @@ Strategy:
 """
 
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import os, json, time, gc
 from collections import Counter, defaultdict
@@ -23,9 +24,9 @@ from ecg_waveform_extraction.hsmm.hsmm_model import STATE_LABELS
 # =====================================================================
 # Config
 # =====================================================================
-DATA_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/data'
-MODEL_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/models'
-OUT_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output_arrhythmia'
+DATA_DIR = str(Path(__file__).resolve().parent / 'data')
+MODEL_DIR = str(Path(__file__).resolve().parent / 'models')
+OUT_DIR = str(Path(__file__).resolve().parent / 'output/arrhythmia')
 os.makedirs(MODEL_DIR, exist_ok=True)
 os.makedirs(OUT_DIR, exist_ok=True)
 

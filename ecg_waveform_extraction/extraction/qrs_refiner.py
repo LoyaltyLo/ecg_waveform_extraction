@@ -191,20 +191,13 @@ _CRITERION_WEIGHTS = {
 def compute_qrs_polarity_v2(ecg_clean: np.ndarray,
                              q_on: int, r_pk: int, s_off: int,
                              fs: float,
-                             lead_name: str | None = None) -> dict:
-    """5-criterion weighted voting QRS polarity classifier.
+                             lead_name: str | None = None,
+                             criterion_mode: str = 'all') -> dict:
+    """QRS polarity classifier.
 
-    Each criterion votes positive (+1), negative (-1), or biphasic (0).
-    Votes are weighted and summed to produce a polarity score in [-1, +1].
-    Confidence = weighted agreement among the 5 criteria.
-
-    Criteria
-    --------
-    1. Dominant Deflection  (w=0.25) — sign of max(|amplitude|)
-    2. R/S Ratio            (w=0.20) — clinical standard (>2.0→pos, <0.5→neg)
-    3. Net Area             (w=0.25) — ∫detrend sign
-    4. Energy Ratio         (w=0.15) — E_up / E_total (noise-tolerant)
-    5. Template Correlation (w=0.15) — morphology match to pos/neg envelopes
+    Two modes:
+      - 'all': 5-criterion weighted voting (default)
+      - 'c1':  Dominant Deflection only — sign of max(|amplitude|)
 
     Parameters
     ----------
@@ -215,17 +208,14 @@ def compute_qrs_polarity_v2(ecg_clean: np.ndarray,
     fs : float
         Sampling frequency.
     lead_name : str or None
-        Lead identifier (I, II, V1, etc.) for clinical prior. If None, no prior.
+        Lead identifier. Only used in 'all' mode for clinical prior.
+    criterion_mode : str
+        'all' (5-criterion) or 'c1' (dominant deflection only).
 
     Returns
     -------
-    dict with keys:
-        polarity          : 'positive' | 'negative' | 'biphasic'
-        confidence        : float 0-1
-        polarity_score    : float [-1, +1] — raw weighted score
-        criteria           : dict — individual criterion results
-        energy_ratio       : float — E_up / E_total
-        peak_count         : int — distinct positive + negative peaks
+    dict with keys: polarity, confidence, polarity_score, criteria,
+                    energy_ratio, peak_count
     """
     T = len(ecg_clean)
     seg = ecg_clean[q_on:s_off + 1]
@@ -316,7 +306,36 @@ def compute_qrs_polarity_v2(ecg_clean: np.ndarray,
     c5_vote, c5_strength = _template_correlation_vote(detrend, fs)
 
     # ==================================================================
-    # Weighted Voting Aggregation
+    # C1-Only Mode: Dominant Deflection
+    # ==================================================================
+    if criterion_mode == 'c1':
+        n_pos_peaks = len(pos_peaks)
+        n_neg_peaks = len(neg_peaks)
+        peak_count = n_pos_peaks + n_neg_peaks
+
+        votes = {'dominant_deflection': {'vote': c1_vote, 'strength': c1_strength}}
+        if c1_vote == 0:
+            polarity = 'biphasic'
+            confidence = 0.3
+            weighted_score = 0.0
+        else:
+            polarity = 'positive' if c1_vote > 0 else 'negative'
+            confidence = round(float(c1_strength), 3)
+            weighted_score = float(c1_vote) * c1_strength
+
+        return {
+            'polarity': polarity,
+            'confidence': confidence,
+            'polarity_score': round(weighted_score, 3),
+            'criteria': votes,
+            'energy_ratio': round(float(energy_ratio), 4),
+            'peak_count': peak_count,
+            'rs_ratio': round(float(rs_ratio), 4),
+            'qrs_net_area': round(float(qrs_net), 4),
+        }
+
+    # ==================================================================
+    # Weighted Voting Aggregation (5-criterion mode)
     # ==================================================================
     w = _CRITERION_WEIGHTS
     votes = {
@@ -362,13 +381,10 @@ def compute_qrs_polarity_v2(ecg_clean: np.ndarray,
         weighted_score += prior * 0.15
 
     # ---- Final polarity decision ----
-    # A beat is "uncertain" when criteria are too conflicted to call
     n_pos_votes = sum(1 for v in votes.values() if v['vote'] == +1)
     n_neg_votes = sum(1 for v in votes.values() if v['vote'] == -1)
     vote_split = abs(n_pos_votes - n_neg_votes)
 
-    # Ambiguous only when criteria are TRULY split (2-2, 2-1-1, 1-1-3)
-    # or agreement/score is very near zero. 3-2 splits still get classified.
     is_ambiguous = (
         agreement < 0.15 or
         abs(weighted_score) < 0.18 or

@@ -5,7 +5,8 @@ Compares with aECG annotations where available.
 """
 
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import os, json, re, time, gc
 from collections import Counter

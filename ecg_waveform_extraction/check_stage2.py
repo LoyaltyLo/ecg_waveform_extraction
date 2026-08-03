@@ -1,6 +1,7 @@
 """Stage 2 integration test: segmenter -> P-wave extraction -> analysis."""
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import numpy as np
 from ecg_waveform_extraction.preprocessing import ECGPreprocessor

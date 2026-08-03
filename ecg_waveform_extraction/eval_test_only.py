@@ -1,7 +1,8 @@
 """Evaluate trained HSMM strictly on unseen test records."""
 
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import os
 import json
@@ -37,9 +38,9 @@ def _jwrite(data, path):
 # =====================================================================
 # Config
 # =====================================================================
-DATA_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/data'
-MODEL_PATH = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/models/hsmm_trained.npz'
-OUT_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output_test_only'
+DATA_DIR = str(Path(__file__).resolve().parent / 'data')
+MODEL_PATH = str(Path(__file__).resolve().parent / 'models/hsmm_trained.npz')
+OUT_DIR = str(Path(__file__).resolve().parent / 'output/test_only')
 os.makedirs(OUT_DIR, exist_ok=True)
 
 MAX_SEC = 15.0

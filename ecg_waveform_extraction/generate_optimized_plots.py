@@ -11,7 +11,8 @@ Also generates:
 """
 
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import os, re, json, time, gc
 import numpy as np
@@ -31,7 +32,7 @@ from ecg_waveform_extraction.utils.vis import STATE_COLORS
 
 # ---- Config ----
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output_rala_full'
+OUT_DIR = str(Path(__file__).resolve().parent / 'output/rala_full')
 PLOTS_DIR = os.path.join(OUT_DIR, '_optimized_plots')
 os.makedirs(PLOTS_DIR, exist_ok=True)
 N_FILES = 50

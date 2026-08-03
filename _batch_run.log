@@ -1,0 +1,4 @@
+  File "<string>", line 107
+    li_p = _fmt_li := dict(li.get('polarity_counts', {})); lii_p = dict(lii.get('polarity_counts', {}))
+                   ^^
+SyntaxError: invalid syntax

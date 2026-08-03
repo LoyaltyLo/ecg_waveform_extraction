@@ -1,6 +1,6 @@
 """Generate comprehensive result plots from RA-LA aECG dataset processing.
 
-Reads all completed result.json files from output_rala/ and generates:
+Reads all completed result.json files from output/rala/ and generates:
   1. Bland-Altman plots (QRS dur, P dur, PR interval)
   2. Scatter plots: HSMM vs ANN with correlation
   3. Error distribution histograms
@@ -9,7 +9,8 @@ Reads all completed result.json files from output_rala/ and generates:
 """
 
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import os, json
 from collections import defaultdict
@@ -20,7 +21,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 # ---- Config ----
-OUT = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output_rala'
+OUT = str(Path(__file__).resolve().parent / 'output/rala')
 PLOTS_DIR = os.path.join(OUT, '_summary_plots')
 os.makedirs(PLOTS_DIR, exist_ok=True)
 

@@ -1,11 +1,11 @@
 """HSMM Modified Viterbi Decoder with explicit duration modeling.
 
 Finds the MAP (maximum a posteriori) state-duration sequence through
-log-space dynamic programming. Optimized with precomputed caches.
+log-space dynamic programming. The duration dimension of the DP is
+vectorized with numpy; per-state caches are computed once per decode.
 """
 
 import numpy as np
-from scipy.special import logsumexp
 from .hsmm_model import HSMMModel
 
 
@@ -27,7 +27,6 @@ class HSMMDecoder:
             log_likelihood: float — Viterbi path log-probability
         """
         T = features.shape[0]
-        N = model.n_states
 
         if T == 0:
             return {
@@ -40,7 +39,7 @@ class HSMMDecoder:
         log_delta, psi = self._viterbi_log(model, log_B)
         segments = self._backtrack(log_delta, psi, T, model)
         state_labels = self._segments_to_labels(segments, T, model.n_states)
-        ll = float(logsumexp(log_delta[T - 1, :]))
+        ll = float(np.max(log_delta[T - 1, :]))
 
         return {
             "state_sequence": segments,
@@ -65,10 +64,19 @@ class HSMMDecoder:
         return log_B
 
     # ==================================================================
-    # Fast Viterbi with precomputed caches
+    # Fast Viterbi with precomputed caches + vectorized duration loop
     # ==================================================================
     def _viterbi_log(self, model: HSMMModel, log_B: np.ndarray):
-        """Optimized HSMM Viterbi with precomputed duration and transition caches."""
+        """HSMM Viterbi with per-state caches and numpy-vectorized durations.
+
+        Recurrence (per t, j):
+            δ_t(j) = max_d [ p_j(d) · b_j(o_{t-d+1:t}) ·
+                             max( π_j·1{start=0},
+                                  max_i δ_{t-d}(i)·a_ij ) ]
+        The max over d is computed with array ops instead of a Python loop.
+        Tie-breaking matches the plain triple loop: durations ascending,
+        predecessors in list order, the initial-segment candidate last.
+        """
         T, N = log_B.shape
 
         # ---- Precompute caches ----
@@ -76,29 +84,36 @@ class HSMMDecoder:
         cum_log_B = np.zeros((T + 1, N))
         cum_log_B[1:] = np.cumsum(log_B, axis=0)
 
-        # (2) Log transition matrix
+        # (2) Log transition matrix (zero-prob transitions -> -inf)
         log_A = np.full((N, N), -np.inf)
-        for i in range(N):
-            for j in range(N):
-                if model.A[i, j] > 0:
-                    log_A[i, j] = np.log(model.A[i, j])
+        pos_A = model.A > 0
+        log_A[pos_A] = np.log(model.A[pos_A])
 
         # (3) Log initial probabilities
         log_pi = np.full(N, -np.inf)
-        for j in range(N):
-            if model.pi[j] > 0:
-                log_pi[j] = np.log(model.pi[j])
+        pos_pi = model.pi > 0
+        log_pi[pos_pi] = np.log(model.pi[pos_pi])
 
-        # (4) Duration log-prob caches per state [d_min .. D_max]
+        # (4) Per-state hoisted arrays (constant across t)
         D_max_arr = model.D_max
-        log_dur_cache = {}
+        preds = model.predecessors
+        d_full = {}        # j -> np.ndarray of durations [d_min..D_j] (finite log_dur only)
+        log_dur_full = {}  # j -> log p_j(d) aligned with d_full[j]
+        preds_arr = {}     # j -> np.ndarray of predecessor state indices
+        logA_preds = {}    # j -> log_A[preds, j] aligned with preds_arr[j]
         for j in range(N):
             dd = model.dur_dists[j]
-            D_j = D_max_arr[j]
-            log_dur_cache[j] = dd.log_prob_range(1, D_j)
-
-        # (5) Predecessors list per state
-        preds = model.predecessors
+            D_j = int(D_max_arr[j])
+            d_j = np.arange(dd.d_min, D_j + 1)
+            # log_prob_range(d_min, D_j) aligns element-wise with d_j
+            ld_j = dd.log_prob_range(dd.d_min, D_j)
+            finite = ~np.isinf(ld_j)
+            d_full[j] = d_j[finite]
+            log_dur_full[j] = ld_j[finite]
+            p_j = np.array([i for i in preds.get(j, [])
+                            if not np.isinf(log_A[i, j])], dtype=int)
+            preds_arr[j] = p_j
+            logA_preds[j] = log_A[p_j, j] if p_j.size else np.array([])
 
         # ---- DP ----
         log_delta = np.full((T, N), -np.inf)
@@ -106,48 +121,57 @@ class HSMMDecoder:
 
         for t in range(T):
             for j in range(N):
-                dd = model.dur_dists[j]
-                D_j = D_max_arr[j]
-                max_d = min(D_j, t + 1)
-                d_min = dd.d_min
-
-                if max_d < d_min:
+                # Durations valid at this t: d <= t + 1
+                d_j = d_full[j]
+                if d_j.size == 0:
                     continue
+                n_valid = np.searchsorted(d_j, t + 1, side="right")
+                if n_valid == 0:
+                    continue
+                d_arr = d_j[:n_valid]
+
+                # Keep the terms separate and add them in exactly the order of
+                # the plain loop — ((prev + log_A) + log_dur) + seg_ll — so the
+                # DP values are bit-identical to the scalar implementation
+                # (a different association order rounds differently and can
+                # flip near-tied argmax decisions downstream).
+                log_dur_v = log_dur_full[j][:n_valid]
+                seg_start = t - d_arr + 1
+                # Segment log-likelihood O(1) per duration (vectorized)
+                seg_ll_v = cum_log_B[t + 1, j] - cum_log_B[seg_start, j]
 
                 best_val = -np.inf
                 best_prev = -1
                 best_d = -1
 
-                for d in range(d_min, max_d + 1):
-                    seg_start = t - d + 1
+                # ---- Transition candidates (seg_start > 0) ----
+                tr = seg_start > 0
+                p_j = preds_arr[j]
+                if tr.any() and p_j.size:
+                    ss = seg_start[tr]
+                    prev_mat = log_delta[ss - 1][:, p_j]      # (n_d, n_preds)
+                    vals = prev_mat + logA_preds[j][None, :]
+                    vals = vals + log_dur_v[tr][:, None]
+                    vals = vals + seg_ll_v[tr][:, None]
+                    k = int(np.argmax(vals))                  # d-major order
+                    v = vals.flat[k]
+                    if v > -np.inf:
+                        best_val = v
+                        best_prev = int(p_j[k % p_j.size])
+                        best_d = int(d_arr[tr][k // p_j.size])
 
-                    # Duration log-prob from cache (index = d-1)
-                    log_dur = log_dur_cache[j][d - 1]
-                    if np.isinf(log_dur):
-                        continue
-
-                    # Segment log-likelihood O(1)
-                    seg_ll = cum_log_B[t + 1, j] - cum_log_B[seg_start, j]
-
-                    if seg_start == 0:
-                        # Initial segment
-                        val = log_pi[j] + log_dur + seg_ll
-                        if val > best_val:
-                            best_val = val
-                            best_prev = -1
-                            best_d = d
-                    else:
-                        for i in preds.get(j, []):
-                            if np.isinf(log_A[i, j]):
-                                continue
-                            prev = log_delta[seg_start - 1, i]
-                            if np.isinf(prev):
-                                continue
-                            val = prev + log_A[i, j] + log_dur + seg_ll
-                            if val > best_val:
-                                best_val = val
-                                best_prev = i
-                                best_d = d
+                # ---- Initial-segment candidate (seg_start == 0) ----
+                # Only possible at d = t + 1 (the largest duration), so the
+                # plain loop considers it after all transition candidates;
+                # the strict '>' here reproduces that tie order.
+                init_idx = np.nonzero(seg_start == 0)[0]
+                if init_idx.size:
+                    k = int(init_idx[0])
+                    v = log_pi[j] + log_dur_v[k] + seg_ll_v[k]
+                    if v > best_val:
+                        best_val = v
+                        best_prev = -1
+                        best_d = int(d_arr[k])
 
                 log_delta[t, j] = best_val
                 if best_d > 0:

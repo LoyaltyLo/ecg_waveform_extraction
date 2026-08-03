@@ -93,6 +93,9 @@ class HSMMModel:
 
         self.D_max = np.full(n_states, GLOBAL_D_MAX, dtype=int)
 
+        # Lazily built predecessor/successor cache (invalidated when A changes)
+        self._topo_cache: tuple[dict[int, list[int]], dict[int, list[int]]] | None = None
+
     # ------------------------------------------------------------------
     # Topology setup
     # ------------------------------------------------------------------
@@ -112,25 +115,34 @@ class HSMMModel:
         row_sums = np.where(row_sums == 0, 1.0, row_sums)
         self.A = self.A / row_sums
 
+        self._invalidate_topology_cache()
+
+    def _invalidate_topology_cache(self):
+        """Drop the cached predecessor/successor maps (call after A changes)."""
+        self._topo_cache = None
+
+    def _get_topology(self) -> tuple[dict[int, list[int]], dict[int, list[int]]]:
+        """Build (or reuse) the predecessor/successor maps for the current A."""
+        if self._topo_cache is None:
+            preds = {j: [] for j in range(self.n_states)}
+            succs = {i: [] for i in range(self.n_states)}
+            for i in range(self.n_states):
+                for j in range(self.n_states):
+                    if self.A[i, j] > 0:
+                        preds[j].append(i)
+                        succs[i].append(j)
+            self._topo_cache = (preds, succs)
+        return self._topo_cache
+
     @property
     def predecessors(self) -> dict[int, list[int]]:
         """Return predecessor mapping computed from the current A matrix."""
-        preds = {j: [] for j in range(self.n_states)}
-        for i in range(self.n_states):
-            for j in range(self.n_states):
-                if self.A[i, j] > 0:
-                    preds[j].append(i)
-        return preds
+        return self._get_topology()[0]
 
     @property
     def successors(self) -> dict[int, list[int]]:
         """Return successor mapping computed from the current A matrix."""
-        succs = {i: [] for i in range(self.n_states)}
-        for i in range(self.n_states):
-            for j in range(self.n_states):
-                if self.A[i, j] > 0:
-                    succs[i].append(j)
-        return succs
+        return self._get_topology()[1]
 
     # ------------------------------------------------------------------
     # Initialization with physiological priors
@@ -224,6 +236,7 @@ class HSMMModel:
         model.pi = np.array(d["pi"])
         model.A = np.array(d["A"])
         model.D_max = np.array(d["D_max"], dtype=int)
+        model._invalidate_topology_cache()
 
         for i, params in enumerate(d["obs_dists"]):
             model.obs_dists[i].set_params(params)

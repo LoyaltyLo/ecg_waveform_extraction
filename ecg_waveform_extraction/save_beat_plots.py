@@ -7,7 +7,8 @@ Reads existing output/{record}/ data and produces:
 """
 
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import os
 import json
@@ -254,7 +255,7 @@ def process_record(rec_name: str, output_base: str):
 # Main
 # =====================================================================
 def main():
-    output_base = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output_trained'
+    output_base = str(Path(__file__).resolve().parent / 'output/trained')
     os.makedirs(output_base, exist_ok=True)
 
     # Find all record directories

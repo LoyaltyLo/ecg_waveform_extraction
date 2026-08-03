@@ -11,7 +11,8 @@ Much faster than full Baum-Welch (no backward pass, no soft counts).
 """
 
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import os
 import gc
@@ -30,8 +31,8 @@ from ecg_waveform_extraction.hsmm.hsmm_model import STATE_LABELS
 # =====================================================================
 # Config
 # =====================================================================
-DATA_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/data'
-MODEL_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/models'
+DATA_DIR = str(Path(__file__).resolve().parent / 'data')
+MODEL_DIR = str(Path(__file__).resolve().parent / 'models')
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 MAX_SEC_PER_RECORD = 12.0

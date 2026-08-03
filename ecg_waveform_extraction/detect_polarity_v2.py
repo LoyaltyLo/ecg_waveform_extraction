@@ -11,13 +11,14 @@ All 5 methods use ANNOTATION-GUIDED windows when available.
 """
 
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import os, json, re
 import numpy as np
 
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output_rala_full'
+OUT_DIR = str(Path(__file__).resolve().parent / 'output/rala_full')
 RESULT_JSON = os.path.join(OUT_DIR, '_polarity_v2.json')
 
 

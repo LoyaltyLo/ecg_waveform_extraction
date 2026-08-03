@@ -10,7 +10,8 @@ Reports broken down by: N, L, R, V, A, /, F, f, J, E, a, S, !
 """
 
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import os, json, time, gc
 from collections import defaultdict, Counter
@@ -31,8 +32,8 @@ from ecg_waveform_extraction.hsmm.hsmm_model import STATE_LABELS, N_STATES
 # =====================================================================
 # Config
 # =====================================================================
-DATA_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/data'
-OUT_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output_arrhythmia'
+DATA_DIR = str(Path(__file__).resolve().parent / 'data')
+OUT_DIR = str(Path(__file__).resolve().parent / 'output/arrhythmia')
 os.makedirs(OUT_DIR, exist_ok=True)
 
 MAX_SEC = 25.0            # 25s per record for more beats

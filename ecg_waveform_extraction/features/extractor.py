@@ -42,10 +42,6 @@ class FeatureExtractor:
             if self._window_len % 2 == 0:
                 self._window_len += 1
 
-        # Feature means/stds for normalization (set during training)
-        self._feat_mean = None
-        self._feat_std = None
-
     @property
     def window_len(self) -> int:
         """Savitzky-Golay window length in samples."""
@@ -101,32 +97,3 @@ class FeatureExtractor:
 
         features = np.column_stack([signal, d1, d2])
         return features
-
-    def fit_normalizer(self, features: np.ndarray):
-        """Compute per-feature mean and std for z-score normalization.
-
-        Parameters
-        ----------
-        features : np.ndarray, shape (N, 3)
-            Feature matrix (from training data).
-        """
-        self._feat_mean = np.mean(features, axis=0)
-        self._feat_std = np.std(features, axis=0)
-        self._feat_std = np.maximum(self._feat_std, 1e-8)
-
-    def normalize(self, features: np.ndarray) -> np.ndarray:
-        """Apply z-score normalization using stored parameters.
-
-        Parameters
-        ----------
-        features : np.ndarray, shape (N, 3)
-
-        Returns
-        -------
-        np.ndarray, shape (N, 3)
-            Normalized features.
-        """
-        if self._feat_mean is None or self._feat_std is None:
-            # Fit on-the-fly if not pre-fitted
-            self.fit_normalizer(features)
-        return (features - self._feat_mean) / self._feat_std

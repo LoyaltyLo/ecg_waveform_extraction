@@ -11,7 +11,8 @@ Sheets:
 """
 
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os, json, re
 import numpy as np
@@ -27,8 +28,8 @@ from openpyxl.chart.series import DataPoint
 
 # ---- Config ----
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output_rala_full'
-XLSX_PATH = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output_rala_full/polarity_detection_report.xlsx'
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output_rala_full')
+XLSX_PATH = str(Path(__file__).resolve().parent.parent / 'output_rala_full/polarity_detection_report.xlsx')
 
 # ---- Styles ----
 HEADER_FONT = Font(name='Microsoft YaHei', bold=True, color='FFFFFF', size=11)

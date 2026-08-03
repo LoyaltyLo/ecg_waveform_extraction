@@ -16,7 +16,6 @@ from scipy.stats import pearsonr
 from ..hsmm.hsmm_model import HSMMModel
 from ..hsmm.hsmm_decoder import HSMMDecoder
 from ..features.extractor import FeatureExtractor
-from ..preprocessing.filters import ECGPreprocessor
 from ..segmentation.segmenter import SegmentResult
 
 
@@ -108,7 +107,6 @@ class PWaveExtractor:
         self._window_before = int(np.round(window_before_ms / 1000.0 * fs))
         self._window_after = int(np.round(window_after_ms / 1000.0 * fs))
 
-        self._preprocessor = ECGPreprocessor(fs=fs)
         self._feature_extractor = FeatureExtractor(fs=fs)
         self._decoder = HSMMDecoder()
 
@@ -251,8 +249,11 @@ class PWaveExtractor:
                                        absence_type="afib_flat")
 
         # ---- Build + decode focused HSMM ----
-        features = self._feature_extractor.extract(
-            self._preprocessor.preprocess(ecg_window))
+        # NOTE: ecg_window comes from SegmentResult.filtered_ecg, which is
+        # already bandpass+notch filtered. Re-running preprocess() here would
+        # apply the filters twice (squaring the magnitude response) and
+        # distort P-wave morphology, so features are extracted directly.
+        features = self._feature_extractor.extract(ecg_window)
         model = self._build_p_wave_model(beat=beat, hr=heart_rate)
         # Step 1: boundary-guided GMM init
         self._init_gmms_by_boundary(model, features, beat, win_start, window_len)
@@ -394,25 +395,24 @@ class PWaveExtractor:
         if template_pool:
             # Resample P-wave to fixed length for comparison
             target_len = 40  # fixed interpolation length
+            x_new = np.linspace(0, 1, target_len)
+            x_orig = np.linspace(0, 1, len(p_ecg))
             try:
                 from scipy.interpolate import interp1d
-                x_orig = np.linspace(0, 1, len(p_ecg))
-                x_new = np.linspace(0, 1, target_len)
                 f_interp = interp1d(x_orig, p_ecg, kind='linear',
                                     bounds_error=False, fill_value=0)
                 p_resampled = f_interp(x_new)
             except Exception:
-                p_resampled = p_ecg
+                p_resampled = np.interp(x_new, x_orig, p_ecg)
 
             correlations = []
             for tpl in template_pool[-5:]:  # last 5 templates
                 try:
                     if len(tpl) >= 4:
                         tp_x = np.linspace(0, 1, len(tpl))
-                        tp_new = np.interp(x_new, tp_x, tpl) if 'x_new' in dir() else tpl
-                        if len(tp_new) == len(p_resampled):
-                            r, _ = pearsonr(p_resampled, tp_new)
-                            correlations.append(max(0, r))
+                        tp_new = np.interp(x_new, tp_x, tpl)
+                        r, _ = pearsonr(p_resampled, tp_new)
+                        correlations.append(max(0, r))
                 except Exception:
                     pass
             if correlations:

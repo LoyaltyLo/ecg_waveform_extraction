@@ -1,6 +1,7 @@
 """Re-run P-wave test and save all results to JSON."""
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import os, json, re, time, gc
 from collections import Counter
 import numpy as np
@@ -11,7 +12,7 @@ from ecg_waveform_extraction.segmentation import ECGSegmenter
 from ecg_waveform_extraction.extraction import PWaveExtractor, PWaveAnalyzer
 
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output_rala_full'
+OUT_DIR = str(Path(__file__).resolve().parent / 'output/rala_full')
 
 files = sorted([f for f in os.listdir(AECG_DIR) if f.endswith('.aECG')])[:50]
 results = []

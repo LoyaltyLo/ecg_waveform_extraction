@@ -1,4 +1,4 @@
-"""Reprocess RA-LA aECG data with full output matching output_test_only format.
+"""Reprocess RA-LA aECG data with full output matching output/test_only format.
 
 For each file saves:
   raw_ecg.npy, filtered_ecg.npy, state_labels.npy, features.npy
@@ -6,11 +6,12 @@ For each file saves:
   summary.json, segmentation.png
   beats/beat_###_waveform.png, beats/beat_###_p_wave.png
 
-Format matches output_test_only/<record>/ exactly.
+Format matches output/test_only/<record>/ exactly.
 """
 
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import os, json, time, gc, traceback
 import numpy as np
@@ -28,7 +29,7 @@ from ecg_waveform_extraction.utils.vis import plot_segmentation, plot_p_wave_det
 
 # ---- Config ----
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output_rala_full'
+OUT_DIR = str(Path(__file__).resolve().parent / 'output/rala_full')
 os.makedirs(OUT_DIR, exist_ok=True)
 
 MAX_SAMPLES = 4000        # 4s for speed
@@ -340,7 +341,7 @@ def process_file(filepath):
 def main():
     files = sorted([f for f in os.listdir(AECG_DIR) if f.endswith('.aECG')])
     print(f"{'='*65}")
-    print(f"  RA-LA REVERSAL — FULL OUTPUT (matching output_test_only format)")
+    print(f"  RA-LA REVERSAL — FULL OUTPUT (matching output/test_only format)")
     print(f"{'='*65}")
     print(f"  Files: {len(files)}")
     print(f"  Output: {OUT_DIR}")
@@ -378,7 +379,7 @@ def main():
             'total_files': len(files),
             'processed_ok': ok_count,
             'total_time_sec': round(total_time, 1),
-            'output_format': 'matches output_test_only',
+            'output_format': 'matches output/test_only',
         }, f, indent=2, cls=NpEnc)
 
     print(f"\n{'='*65}")

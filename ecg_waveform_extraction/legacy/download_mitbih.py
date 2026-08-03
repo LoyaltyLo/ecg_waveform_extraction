@@ -4,7 +4,7 @@ import ssl
 import urllib.request
 import time
 
-DATA_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/data'
+DATA_DIR = str(Path(__file__).resolve().parent.parent / 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 
 MITBIH_RECORDS = (

@@ -10,13 +10,14 @@ Uses existing HSMM segmentation output (p_waves.json + segmentation.json + filte
 """
 
 import sys
-sys.path.insert(0, 'c:/LoyaltyLo/PythonProjects/ECG_engineering')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os, json
 import numpy as np
 
 # ---- Config ----
-DATA_DIR = 'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output_rala_full'
+DATA_DIR = str(Path(__file__).resolve().parent.parent / 'output_rala_full')
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
 
 
