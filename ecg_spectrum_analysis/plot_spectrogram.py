@@ -145,7 +145,7 @@ def _add_band_overlay(ax):
         mid = (band_edges[i] + band_edges[i+1]) / 2
         ax.text(ax.get_xlim()[1] * 0.995, mid, names[i],
                 ha='right', va='center', fontsize=7, alpha=0.5,
-                transform=ax.get_data_transform())
+                transform=ax.transData)
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ def plot_signal_and_spectrogram(
     if cmap is None:
         cmap = CMAP
 
-    fig = plt.figure(figsize=figsize, dpi=dpi)
+    fig = plt.figure(figsize=figsize, dpi=dpi, constrained_layout=True)
     gs = fig.add_gridspec(2, 2, height_ratios=[1, 1.2],
                           hspace=0.35, wspace=0.30)
 
@@ -375,9 +375,6 @@ def plot_signal_and_spectrogram(
         fig.suptitle(f'{spec.lead_name} — {spec.record_name}',
                      fontsize=11, fontweight='bold', y=0.99)
 
-    fig.tight_layout()
-    if title or spec.lead_name:
-        fig.subplots_adjust(top=0.94)
     return fig
 
 
