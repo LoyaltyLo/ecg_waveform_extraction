@@ -280,6 +280,121 @@ def plot_psd_comparison(
 
 
 # ---------------------------------------------------------------------------
+# Waveform + Spectrum stacked view (single lead, shared time axis)
+# ---------------------------------------------------------------------------
+def plot_waveform_with_spectrum(
+    ecg_signal: np.ndarray,
+    spec: ECG_Spectrogram,
+    time_start: float = 0,
+    figsize: tuple[float, float] = (12, 5),
+    dpi: int = FIG_DPI,
+    cmap: str | None = None,
+    title: str | None = None,
+) -> plt.Figure:
+    """Two-panel figure: ECG waveform (top) aligned with spectrogram (bottom).
+
+    The two panels share the same time axis so you can visually correlate
+    QRS complexes / P waves with their spectral signatures.
+
+    For 2-D spectrograms (STFT, CWT): waveform on top, time-frequency
+    heatmap on bottom, X axes aligned.
+
+    For 1-D PSD: waveform on top, frequency-power line plot on bottom
+    (no shared time axis — PSD is time-averaged).
+
+    Parameters
+    ----------
+    ecg_signal : np.ndarray, shape (N,)
+        Preprocessed ECG signal in the time domain.
+    spec : ECG_Spectrogram
+        Computed spectrogram (STFT, CWT, or PSD).
+    time_start : float
+        Time offset in seconds for the waveform x-axis.
+    figsize : tuple
+        Figure size (width, height) in inches.
+    dpi : int
+        Output resolution.
+    cmap : str or None
+        Colormap for 2-D spectrograms. Auto-selected if None.
+    title : str or None
+        Overall figure suptitle. Auto-generated if None.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+    """
+    if cmap is None:
+        cmap = CMAP
+
+    T = len(ecg_signal) / spec.fs
+    t_sig = np.linspace(time_start, time_start + T, len(ecg_signal))
+
+    if spec.data.ndim == 1:
+        # ---- PSD: waveform top, PSD line bottom ----
+        fig, (ax_wave, ax_psd) = plt.subplots(
+            2, 1, figsize=figsize, dpi=dpi,
+            gridspec_kw={'height_ratios': [1, 1.2]},
+        )
+
+        # Top: waveform
+        ax_wave.plot(t_sig, ecg_signal, color='#2F5496', linewidth=0.6)
+        ax_wave.set_xlim(t_sig[0], t_sig[-1])
+        _setup_axes(ax_wave, xlabel='Time (s)', ylabel='Amplitude')
+        ax_wave.set_title(f'ECG Waveform — {spec.lead_name}', fontsize=10, fontweight='bold')
+
+        # Bottom: PSD
+        ax_psd.plot(spec.freqs, spec.data, color='#E74C3C', linewidth=1.0)
+        ax_psd.fill_between(spec.freqs, spec.data, alpha=0.12, color='#E74C3C')
+        ax_psd.set_xlim(spec.freqs[0], spec.freqs[-1])
+        ax_psd.set_yscale('log')
+        _setup_axes(ax_psd, xlabel='Frequency (Hz)', ylabel='Power [log]')
+        ax_psd.set_title('Power Spectral Density', fontsize=10, fontweight='bold')
+    else:
+        # ---- STFT/CWT: waveform top, spectrogram bottom, shared X ----
+        fig, (ax_wave, ax_spec) = plt.subplots(
+            2, 1, figsize=figsize, dpi=dpi,
+            sharex=True,
+            gridspec_kw={'height_ratios': [1, 1.2]},
+        )
+
+        # Top: waveform
+        ax_wave.plot(t_sig, ecg_signal, color='#2F5496', linewidth=0.6)
+        ax_wave.set_xlim(t_sig[0], t_sig[-1])
+        _setup_axes(ax_wave, xlabel='', ylabel='Amplitude')
+        ax_wave.set_title(f'ECG Waveform — {spec.lead_name}', fontsize=10, fontweight='bold')
+        # Hide x-tick labels on top panel (shared axis)
+        ax_wave.tick_params(axis='x', labelbottom=False)
+
+        # Bottom: spectrogram (time axis auto-shared with waveform)
+        extent = [spec.times[0] + time_start, spec.times[-1] + time_start,
+                  spec.freqs[0], spec.freqs[-1]]
+        im = ax_spec.imshow(spec.data, aspect='auto', origin='lower',
+                            extent=extent, cmap=cmap, interpolation='bilinear')
+        _setup_axes(ax_spec, xlabel='Time (s)', ylabel='Frequency (Hz)')
+        method_label = spec.method.upper()
+        ax_spec.set_title(f'{method_label} Spectrogram', fontsize=10, fontweight='bold')
+
+        cbar = fig.colorbar(im, ax=ax_spec, shrink=0.92, pad=0.02)
+        if spec.method == 'cwt':
+            cbar.set_label('Magnitude', fontsize=8)
+        else:
+            cbar.set_label('Power (V²/Hz)', fontsize=8)
+        cbar.ax.tick_params(labelsize=7)
+
+    # Suptitle
+    if title:
+        fig.suptitle(title, fontsize=11, fontweight='bold')
+    elif spec.record_name:
+        fig.suptitle(f'{spec.lead_name} — {spec.record_name}',
+                     fontsize=11, fontweight='bold')
+
+    fig.tight_layout()
+    if title or spec.lead_name:
+        fig.subplots_adjust(top=0.92)
+    return fig
+
+
+# ---------------------------------------------------------------------------
 # Combined view: signal + spectrogram + PSD
 # ---------------------------------------------------------------------------
 def plot_signal_and_spectrogram(

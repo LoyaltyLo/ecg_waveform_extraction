@@ -7,18 +7,19 @@ from aECG XML files.
 Output structure per record:
     output_spectrograms/
     └── <record_id>/
-        ├── combined_<record>.png       # Signal + spectrogram + PSD (3-panel)
-        ├── multi_lead_<record>.png     # 12-lead spectrogram grid
-        ├── psd_comparison_<record>.png # Overlaid PSD curves
-        └── per_lead/
-            ├── <record>_I_stft.png
-            ├── <record>_II_stft.png
-            ...
+        ├── I/
+        │   ├── <record>_I_waveform_stft.png   # waveform + STFT spectrogram
+        │   ├── <record>_I_waveform_cwt.png    # waveform + CWT scalogram
+        │   └── <record>_I_waveform_psd.png    # waveform + PSD
+        ├── II/ ...
+        ├── multi_lead_<record>_stft.png        # 12-lead STFT grid overview
+        ├── multi_lead_<record>_cwt.png         # 12-lead CWT grid overview
+        └── psd_comparison_<record>.png         # 12-lead PSD overlay
 
 Usage:
     python -m ecg_spectrum_analysis.batch_spectrogram --n 10
     python -m ecg_spectrum_analysis.batch_spectrogram --n 50 --method stft
-    python -m ecg_spectrum_analysis.batch_spectrogram --n 20 --method all --no-per-lead
+    python -m ecg_spectrum_analysis.batch_spectrogram --n 20 --no-waveform
 """
 
 import sys
@@ -38,9 +39,8 @@ from ecg_spectrum_analysis.spectrogram import (
     ECG_Spectrogram, band_power,
 )
 from ecg_spectrum_analysis.plot_spectrogram import (
-    plot_spectrogram, plot_multi_lead_spectrograms,
-    plot_psd_comparison, plot_signal_and_spectrogram,
-    save_figure,
+    plot_waveform_with_spectrum, plot_multi_lead_spectrograms,
+    plot_psd_comparison, save_figure,
 )
 
 # ---------------------------------------------------------------------------
@@ -66,8 +66,7 @@ def process_one_record(
     filepath: str,
     out_dir: str,
     method: str = 'all',
-    per_lead: bool = True,
-    combined: bool = True,
+    per_lead_waveform: bool = True,
     multi_lead_grid: bool = True,
     psd_comparison: bool = True,
     dpi: int = 150,
@@ -82,12 +81,10 @@ def process_one_record(
         Output directory for spectrogram images.
     method : str
         'stft', 'cwt', 'psd', or 'all'.
-    per_lead : bool
-        Save individual per-lead spectrograms.
-    combined : bool
-        Save 3-panel (signal + spectrogram + PSD) per lead.
+    per_lead_waveform : bool
+        Save per-lead waveform+spectrum stacked images (each lead in its own subdirectory).
     multi_lead_grid : bool
-        Save 12-lead grid overview.
+        Save 12-lead grid overviews.
     psd_comparison : bool
         Save overlaid PSD comparison.
     dpi : int
@@ -100,8 +97,6 @@ def process_one_record(
     # ---- Parse ----
     record_id = Path(filepath).stem
     record_out = Path(out_dir) / record_id
-    per_lead_dir = record_out / 'per_lead'
-    per_lead_dir.mkdir(parents=True, exist_ok=True)
 
     aecg = parse_aecg(filepath, max_samples=MAX_SAMPLES)
     fs = aecg['fs']
@@ -127,6 +122,11 @@ def process_one_record(
 
         clean = prep.preprocess(raw[:MAX_SAMPLES].astype(np.float64))
 
+        # Per-lead output directory
+        lead_out = record_out / lead_name
+        if per_lead_waveform:
+            lead_out.mkdir(parents=True, exist_ok=True)
+
         for m in methods_to_run:
             if m == 'stft':
                 spec = compute_spectrogram(
@@ -135,17 +135,9 @@ def process_one_record(
                 )
                 stft_specs.append(spec)
 
-                if per_lead:
-                    fig = plot_spectrogram(spec, dpi=dpi)
-                    save_figure(fig, per_lead_dir / f'{record_id}_{lead_name}_stft.png')
-
-                if combined:
-                    psd = compute_psd(
-                        clean, fs=fs, freq_limit=60.0, scale='power',
-                        lead_name=lead_name, record_name=record_id,
-                    )
-                    fig = plot_signal_and_spectrogram(clean, spec, psd, dpi=dpi)
-                    save_figure(fig, per_lead_dir / f'{record_id}_{lead_name}_combined.png')
+                if per_lead_waveform:
+                    fig = plot_waveform_with_spectrum(clean, spec, dpi=dpi)
+                    save_figure(fig, lead_out / f'{record_id}_{lead_name}_waveform_stft.png')
 
             elif m == 'cwt':
                 spec = compute_scalogram(
@@ -154,9 +146,9 @@ def process_one_record(
                 )
                 cwt_specs.append(spec)
 
-                if per_lead:
-                    fig = plot_spectrogram(spec, dpi=dpi)
-                    save_figure(fig, per_lead_dir / f'{record_id}_{lead_name}_cwt.png')
+                if per_lead_waveform:
+                    fig = plot_waveform_with_spectrum(clean, spec, dpi=dpi)
+                    save_figure(fig, lead_out / f'{record_id}_{lead_name}_waveform_cwt.png')
 
             elif m == 'psd':
                 spec = compute_psd(
@@ -164,6 +156,10 @@ def process_one_record(
                     lead_name=lead_name, record_name=record_id,
                 )
                 psd_specs.append(spec)
+
+                if per_lead_waveform:
+                    fig = plot_waveform_with_spectrum(clean, spec, dpi=dpi)
+                    save_figure(fig, lead_out / f'{record_id}_{lead_name}_waveform_psd.png')
 
     # ---- Multi-lead overviews ----
     if multi_lead_grid and stft_specs:
@@ -209,10 +205,8 @@ Examples:
                         help='Number of records to process (default: 10).')
     parser.add_argument('--method', choices=['stft', 'cwt', 'psd', 'all'],
                         default='all', help='Spectrogram method (default: all).')
-    parser.add_argument('--no-per-lead', action='store_true',
-                        help='Skip per-lead individual spectrograms.')
-    parser.add_argument('--no-combined', action='store_true',
-                        help='Skip 3-panel combined views.')
+    parser.add_argument('--no-waveform', action='store_true',
+                        help='Skip per-lead waveform+spectrum images.')
     parser.add_argument('--no-grid', action='store_true',
                         help='Skip multi-lead grid overviews.')
     parser.add_argument('--no-psd-comp', action='store_true',
@@ -236,8 +230,7 @@ Examples:
     print(f'Found {n_total} aECG files in {aecg_dir}')
     print(f'Method: {args.method} | DPI: {args.dpi}')
     print(f'Output: {out_dir}')
-    print(f'Per-lead: {not args.no_per_lead} | Combined: {not args.no_combined}')
-    print(f'Multi-lead grid: {not args.no_grid} | PSD comparison: {not args.no_psd_comp}')
+    print(f'Waveform+spectrum: {not args.no_waveform} | Grid: {not args.no_grid} | PSD comp: {not args.no_psd_comp}')
     print('=' * 60)
 
     t_start = time.perf_counter()
@@ -253,8 +246,7 @@ Examples:
                 fp,
                 out_dir=out_dir,
                 method=args.method,
-                per_lead=not args.no_per_lead,
-                combined=not args.no_combined,
+                per_lead_waveform=not args.no_waveform,
                 multi_lead_grid=not args.no_grid,
                 psd_comparison=not args.no_psd_comp,
                 dpi=args.dpi,
