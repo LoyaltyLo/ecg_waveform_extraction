@@ -23,13 +23,13 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-from ecg_waveform_extraction.preprocessing import ECGPreprocessor
-from ecg_waveform_extraction.features import FeatureExtractor
-from ecg_waveform_extraction.hsmm import HSMMModel, HSMMDecoder, smart_initialize_gmms
-from ecg_waveform_extraction.segmentation import ECGSegmenter
-from ecg_waveform_extraction.extraction import PWaveExtractor, PWaveAnalyzer
-from ecg_waveform_extraction.utils.vis import plot_segmentation, plot_p_wave_detail, STATE_COLORS
-from ecg_waveform_extraction.hsmm.hsmm_model import STATE_LABELS
+from ecg_waveform_extraction.src.preprocessing import ECGPreprocessor
+from ecg_waveform_extraction.src.features import FeatureExtractor
+from ecg_waveform_extraction.src.hsmm import HSMMModel, HSMMDecoder, smart_initialize_gmms
+from ecg_waveform_extraction.src.segmentation import ECGSegmenter
+from ecg_waveform_extraction.src.extraction import PWaveExtractor, PWaveAnalyzer
+from ecg_waveform_extraction.src.utils.vis import plot_segmentation, plot_p_wave_detail, STATE_COLORS
+from ecg_waveform_extraction.src.hsmm.hsmm_model import STATE_LABELS
 
 
 # =====================================================================

@@ -10,12 +10,12 @@ import time
 import numpy as np
 import wfdb
 
-from ecg_waveform_extraction.preprocessing import ECGPreprocessor
-from ecg_waveform_extraction.features import FeatureExtractor
-from ecg_waveform_extraction.hsmm import HSMMModel
-from ecg_waveform_extraction.segmentation import ECGSegmenter
-from ecg_waveform_extraction.extraction import PWaveExtractor, PWaveAnalyzer
-from ecg_waveform_extraction.utils.vis import plot_segmentation, plot_p_wave_detail
+from ecg_waveform_extraction.src.preprocessing import ECGPreprocessor
+from ecg_waveform_extraction.src.features import FeatureExtractor
+from ecg_waveform_extraction.src.hsmm import HSMMModel
+from ecg_waveform_extraction.src.segmentation import ECGSegmenter
+from ecg_waveform_extraction.src.extraction import PWaveExtractor, PWaveAnalyzer
+from ecg_waveform_extraction.src.utils.vis import plot_segmentation, plot_p_wave_detail
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -216,8 +216,8 @@ def eval_record(rec, model):
             l_win = seg.state_labels[ws:we + 1]
 
             # State color bands
-            from ecg_waveform_extraction.utils.vis import STATE_COLORS
-            from ecg_waveform_extraction.hsmm.hsmm_model import STATE_LABELS
+            from ecg_waveform_extraction.src.utils.vis import STATE_COLORS
+            from ecg_waveform_extraction.src.hsmm.hsmm_model import STATE_LABELS
             if len(l_win) > 0:
                 prev = l_win[0]; seg_start = 0
                 for i in range(1, len(l_win)):

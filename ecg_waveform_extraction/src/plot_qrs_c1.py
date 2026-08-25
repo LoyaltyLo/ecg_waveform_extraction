@@ -239,7 +239,7 @@ def save_qrs_c1_plots(seg_data, ll_result, rec_name, rec_dir, dpi=130):
     rec_name : str
     rec_dir : str
     """
-    from ecg_waveform_extraction.limb_lead_processor import LIMB_LEADS
+    from ecg_waveform_extraction.src.limb_lead_processor import LIMB_LEADS
 
     for lead_name in LIMB_LEADS:
         sd = seg_data.get(lead_name)

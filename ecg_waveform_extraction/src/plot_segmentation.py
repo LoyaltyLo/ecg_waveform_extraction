@@ -12,7 +12,7 @@ Plot Types
 
 Usage
 -----
-    from ecg_waveform_extraction.plot_segmentation import (
+    from ecg_waveform_extraction.src.plot_segmentation import (
         plot_lead_overview, plot_beat_detail, plot_record_overview,
         save_all_segmentation_plots,
     )

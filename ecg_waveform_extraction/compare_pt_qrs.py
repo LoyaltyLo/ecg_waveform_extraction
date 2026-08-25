@@ -20,11 +20,11 @@ import matplotlib.pyplot as plt
 
 import neurokit2 as nk
 
-from ecg_waveform_extraction.preprocessing import ECGPreprocessor
-from ecg_waveform_extraction.features import FeatureExtractor
-from ecg_waveform_extraction.hsmm import HSMMModel, smart_initialize_gmms
-from ecg_waveform_extraction.segmentation import ECGSegmenter
-from ecg_waveform_extraction.extraction.qrs_refiner import (
+from ecg_waveform_extraction.src.preprocessing import ECGPreprocessor
+from ecg_waveform_extraction.src.features import FeatureExtractor
+from ecg_waveform_extraction.src.hsmm import HSMMModel, smart_initialize_gmms
+from ecg_waveform_extraction.src.segmentation import ECGSegmenter
+from ecg_waveform_extraction.src.extraction.qrs_refiner import (
     refine_qrs_boundaries, compute_qrs_polarity_v2,
 )
 

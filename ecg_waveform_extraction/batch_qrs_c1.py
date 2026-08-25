@@ -19,11 +19,11 @@ import os, json, time, gc, argparse
 from collections import Counter
 import numpy as np
 
-from ecg_waveform_extraction.limb_lead_processor import (
+from ecg_waveform_extraction.src.limb_lead_processor import (
     LimbLeadProcessor, LIMB_LEADS,
 )
-from ecg_waveform_extraction.utils.aecg_parser import parse_aecg
-from ecg_waveform_extraction.plot_qrs_c1 import save_qrs_c1_plots
+from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
+from ecg_waveform_extraction.src.plot_qrs_c1 import save_qrs_c1_plots
 from ecg_waveform_extraction.export_reversal_xlsx import get_patient_name
 
 import openpyxl

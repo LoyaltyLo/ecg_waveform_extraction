@@ -21,12 +21,12 @@ import time
 import numpy as np
 import wfdb
 
-from ecg_waveform_extraction.preprocessing import ECGPreprocessor
-from ecg_waveform_extraction.features import FeatureExtractor
-from ecg_waveform_extraction.hsmm import (
+from ecg_waveform_extraction.src.preprocessing import ECGPreprocessor
+from ecg_waveform_extraction.src.features import FeatureExtractor
+from ecg_waveform_extraction.src.hsmm import (
     HSMMModel, HSMMDecoder, smart_initialize_gmms,
 )
-from ecg_waveform_extraction.hsmm.hsmm_model import STATE_LABELS
+from ecg_waveform_extraction.src.hsmm.hsmm_model import STATE_LABELS
 
 # =====================================================================
 # Config

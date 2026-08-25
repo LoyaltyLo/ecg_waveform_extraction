@@ -19,8 +19,8 @@ import os, json, time, gc, argparse
 from collections import Counter
 import numpy as np
 
-from ecg_waveform_extraction.limb_lead_processor import LimbLeadProcessor
-from ecg_waveform_extraction.utils.aecg_parser import parse_aecg
+from ecg_waveform_extraction.src.limb_lead_processor import LimbLeadProcessor
+from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 from ecg_waveform_extraction.export_reversal_xlsx import get_patient_name
 
 import openpyxl

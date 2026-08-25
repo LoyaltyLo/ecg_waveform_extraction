@@ -9,13 +9,13 @@ Covers:
 import numpy as np
 import pytest
 
-from ecg_waveform_extraction.preprocessing import ECGPreprocessor
-from ecg_waveform_extraction.features import FeatureExtractor
-from ecg_waveform_extraction.hsmm import HSMMModel, HSMMDecoder, smart_initialize_gmms
-from ecg_waveform_extraction.hsmm.distributions import GaussianMixtureModel
-from ecg_waveform_extraction.hsmm.hsmm_model import ALLOWED_TRANSITIONS
-from ecg_waveform_extraction.segmentation import ECGSegmenter
-from ecg_waveform_extraction.utils.data_loader import generate_synthetic_ecg
+from ecg_waveform_extraction.src.preprocessing import ECGPreprocessor
+from ecg_waveform_extraction.src.features import FeatureExtractor
+from ecg_waveform_extraction.src.hsmm import HSMMModel, HSMMDecoder, smart_initialize_gmms
+from ecg_waveform_extraction.src.hsmm.distributions import GaussianMixtureModel
+from ecg_waveform_extraction.src.hsmm.hsmm_model import ALLOWED_TRANSITIONS
+from ecg_waveform_extraction.src.segmentation import ECGSegmenter
+from ecg_waveform_extraction.src.utils.data_loader import generate_synthetic_ecg
 
 FS = 250.0
 

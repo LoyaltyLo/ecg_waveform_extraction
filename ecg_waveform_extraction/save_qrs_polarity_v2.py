@@ -17,10 +17,10 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-from ecg_waveform_extraction.extraction.qrs_refiner import (
+from ecg_waveform_extraction.src.extraction.qrs_refiner import (
     refine_qrs_boundaries, compute_qrs_polarity_v2,
 )
-from ecg_waveform_extraction.utils.aecg_parser import parse_aecg
+from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 
 # ---------------------------------------------------------------------------
 # Config

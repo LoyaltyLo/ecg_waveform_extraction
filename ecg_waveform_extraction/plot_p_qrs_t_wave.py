@@ -16,14 +16,14 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
-from ecg_waveform_extraction.preprocessing import ECGPreprocessor
-from ecg_waveform_extraction.features import FeatureExtractor
-from ecg_waveform_extraction.hsmm import HSMMModel, smart_initialize_gmms
-from ecg_waveform_extraction.segmentation import ECGSegmenter
-from ecg_waveform_extraction.extraction import PWaveExtractor, refine_qrs_boundaries
-from ecg_waveform_extraction.hsmm.hsmm_model import STATE_LABELS
-from ecg_waveform_extraction.utils.vis import STATE_COLORS
-from ecg_waveform_extraction.utils.aecg_parser import parse_aecg
+from ecg_waveform_extraction.src.preprocessing import ECGPreprocessor
+from ecg_waveform_extraction.src.features import FeatureExtractor
+from ecg_waveform_extraction.src.hsmm import HSMMModel, smart_initialize_gmms
+from ecg_waveform_extraction.src.segmentation import ECGSegmenter
+from ecg_waveform_extraction.src.extraction import PWaveExtractor, refine_qrs_boundaries
+from ecg_waveform_extraction.src.hsmm.hsmm_model import STATE_LABELS
+from ecg_waveform_extraction.src.utils.vis import STATE_COLORS
+from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
 OUT_DIR = str(Path(__file__).resolve().parent / 'output/rala_full/_p_qrs_t_wave')

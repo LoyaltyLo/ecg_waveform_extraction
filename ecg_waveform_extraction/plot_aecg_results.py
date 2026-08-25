@@ -314,11 +314,11 @@ fig, axes = plt.subplots(2, 5, figsize=(22, 9))
 fig.suptitle('Best vs Worst QRS Duration Matching Examples', fontsize=14, fontweight='bold')
 
 # Need to regenerate segmentation plots for these specific records
-from ecg_waveform_extraction.preprocessing import ECGPreprocessor
-from ecg_waveform_extraction.features import FeatureExtractor
-from ecg_waveform_extraction.hsmm import HSMMModel, smart_initialize_gmms
-from ecg_waveform_extraction.segmentation import ECGSegmenter
-from ecg_waveform_extraction.utils.vis import plot_segmentation
+from ecg_waveform_extraction.src.preprocessing import ECGPreprocessor
+from ecg_waveform_extraction.src.features import FeatureExtractor
+from ecg_waveform_extraction.src.hsmm import HSMMModel, smart_initialize_gmms
+from ecg_waveform_extraction.src.segmentation import ECGSegmenter
+from ecg_waveform_extraction.src.utils.vis import plot_segmentation
 import gc
 
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
@@ -364,8 +364,8 @@ for row_idx, examples in enumerate([best_5, worst_5]):
             # Compact plot
             t = np.arange(len(clean)) / fs
             lbls = seg_result.state_labels
-            from ecg_waveform_extraction.hsmm.hsmm_model import STATE_LABELS
-            from ecg_waveform_extraction.utils.vis import STATE_COLORS
+            from ecg_waveform_extraction.src.hsmm.hsmm_model import STATE_LABELS
+            from ecg_waveform_extraction.src.utils.vis import STATE_COLORS
             if len(lbls) > 0:
                 prev = lbls[0]; seg_start = 0
                 for i in range(1, len(lbls)):

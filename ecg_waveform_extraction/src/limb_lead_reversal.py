@@ -18,11 +18,11 @@ with the highest score above threshold wins.
 
 Usage
 -----
-    from ecg_waveform_extraction.limb_lead_reversal import (
+    from ecg_waveform_extraction.src.limb_lead_reversal import (
         LimbLeadReversalDetector, ReversalResult,
     )
-    from ecg_waveform_extraction.limb_lead_processor import LimbLeadProcessor
-    from ecg_waveform_extraction.utils.aecg_parser import parse_aecg
+    from ecg_waveform_extraction.src.limb_lead_processor import LimbLeadProcessor
+    from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 
     # Option A: from pre-computed LimbLeadResult
     processor = LimbLeadProcessor(max_samples=4000)

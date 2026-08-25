@@ -5,10 +5,10 @@ pipeline, extracting per-beat QRS metrics (v2 polarity) and P-wave features
 for each lead. This is the foundation for limb lead reversal detection.
 
 Usage:
-    from ecg_waveform_extraction.limb_lead_processor import (
+    from ecg_waveform_extraction.src.limb_lead_processor import (
         LimbLeadProcessor, LIMB_LEADS,
     )
-    from ecg_waveform_extraction.utils.aecg_parser import parse_aecg
+    from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 
     processor = LimbLeadProcessor(max_samples=4000)
     aecg = parse_aecg('path/to/file.aECG')

@@ -31,8 +31,8 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 
-from ecg_waveform_extraction.utils.aecg_parser import parse_aecg
-from ecg_waveform_extraction.preprocessing.filters import ECGPreprocessor
+from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
+from ecg_waveform_extraction.src.preprocessing.filters import ECGPreprocessor
 
 from ecg_spectrum_analysis.spectrogram import (
     compute_spectrogram, compute_psd, compute_scalogram,

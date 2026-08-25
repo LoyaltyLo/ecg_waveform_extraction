@@ -23,11 +23,11 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-from ecg_waveform_extraction.limb_lead_processor import (
+from ecg_waveform_extraction.src.limb_lead_processor import (
     LimbLeadProcessor, LIMB_LEADS, LEAD_PLOT_ORDER,
     result_to_dict, build_summary_table, compare_polarity_across_leads,
 )
-from ecg_waveform_extraction.utils.aecg_parser import parse_aecg
+from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 
 # ---------------------------------------------------------------------------
 # Config
@@ -113,7 +113,7 @@ def _save_segmentation_data(seg_data: dict, rec_dir: str, rec_name: str):
     rec_dir : str
     rec_name : str
     """
-    from ecg_waveform_extraction.plot_segmentation import save_all_segmentation_plots
+    from ecg_waveform_extraction.src.plot_segmentation import save_all_segmentation_plots
 
     # Save numpy arrays per lead
     for lead_name, sd in seg_data.items():
@@ -139,7 +139,7 @@ def _save_segmentation_data(seg_data: dict, rec_dir: str, rec_name: str):
 # ---------------------------------------------------------------------------
 def _save_record_plot(result, rec_dir):
     """3×2 subplot grid showing first ~4s of each limb lead with QRS coloring."""
-    from ecg_waveform_extraction.preprocessing import ECGPreprocessor
+    from ecg_waveform_extraction.src.preprocessing import ECGPreprocessor
 
     fig, axes = plt.subplots(3, 2, figsize=(18, 10))
     fig.suptitle(f'{result.record} — 6-Lead Limb HSMM QRS', fontsize=13, fontweight='bold')
@@ -366,7 +366,7 @@ def main():
     n_total = len(files)
 
     # Monkey-patch LIMB_LEADS if subset requested
-    import ecg_waveform_extraction.limb_lead_processor as llp
+    import ecg_waveform_extraction.src.limb_lead_processor as llp
     original_limb_leads = llp.LIMB_LEADS
     if args.lead:
         llp.LIMB_LEADS = leads_to_process

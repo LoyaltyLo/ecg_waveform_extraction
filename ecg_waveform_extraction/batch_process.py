@@ -14,12 +14,12 @@ import time
 import traceback
 import numpy as np
 
-from ecg_waveform_extraction.preprocessing import ECGPreprocessor
-from ecg_waveform_extraction.features import FeatureExtractor
-from ecg_waveform_extraction.hsmm import HSMMModel
-from ecg_waveform_extraction.segmentation import ECGSegmenter
-from ecg_waveform_extraction.extraction import PWaveExtractor, PWaveAnalyzer
-from ecg_waveform_extraction.utils.vis import plot_segmentation, plot_p_wave_detail
+from ecg_waveform_extraction.src.preprocessing import ECGPreprocessor
+from ecg_waveform_extraction.src.features import FeatureExtractor
+from ecg_waveform_extraction.src.hsmm import HSMMModel
+from ecg_waveform_extraction.src.segmentation import ECGSegmenter
+from ecg_waveform_extraction.src.extraction import PWaveExtractor, PWaveAnalyzer
+from ecg_waveform_extraction.src.utils.vis import plot_segmentation, plot_p_wave_detail
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt

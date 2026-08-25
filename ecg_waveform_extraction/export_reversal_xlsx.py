@@ -15,13 +15,13 @@ import os, json, time, gc, argparse
 from collections import Counter
 import numpy as np
 
-from ecg_waveform_extraction.limb_lead_processor import (
+from ecg_waveform_extraction.src.limb_lead_processor import (
     LimbLeadProcessor, LIMB_LEADS,
 )
-from ecg_waveform_extraction.limb_lead_reversal import (
+from ecg_waveform_extraction.src.limb_lead_reversal import (
     LimbLeadReversalDetector, REVERSAL_TYPES, REVERSAL_NAMES,
 )
-from ecg_waveform_extraction.utils.aecg_parser import parse_aecg
+from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 
 import openpyxl
 from openpyxl.styles import (
@@ -91,7 +91,7 @@ def load_cached_result(rec_name: str):
     with open(cache_path, encoding='utf-8') as f:
         cache_data = json.load(f)
 
-    from ecg_waveform_extraction.limb_lead_processor import LeadResult, LimbLeadResult
+    from ecg_waveform_extraction.src.limb_lead_processor import LeadResult, LimbLeadResult
 
     leads = {}
     for ln, ld in cache_data['leads'].items():

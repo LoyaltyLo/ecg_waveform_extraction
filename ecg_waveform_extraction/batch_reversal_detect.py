@@ -21,14 +21,14 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-from ecg_waveform_extraction.limb_lead_processor import (
+from ecg_waveform_extraction.src.limb_lead_processor import (
     LimbLeadProcessor, LimbLeadResult,
 )
-from ecg_waveform_extraction.limb_lead_reversal import (
+from ecg_waveform_extraction.src.limb_lead_reversal import (
     LimbLeadReversalDetector, ReversalResult, reversal_result_to_dict,
     REVERSAL_TYPES, REVERSAL_NAMES,
 )
-from ecg_waveform_extraction.utils.aecg_parser import parse_aecg
+from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 
 # ---------------------------------------------------------------------------
 # Config
@@ -82,7 +82,7 @@ def detect_record(fpath: str, detector: LimbLeadReversalDetector,
             cache_data = json.load(f)
 
         # Reconstruct LimbLeadResult from cache
-        from ecg_waveform_extraction.limb_lead_processor import LeadResult
+        from ecg_waveform_extraction.src.limb_lead_processor import LeadResult
         leads = {}
         for ln, ld in cache_data['leads'].items():
             if ld is None:

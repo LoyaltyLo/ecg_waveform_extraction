@@ -4,7 +4,7 @@ Extracts multi-lead signals, global measurements, P/QRS/T annotations,
 and interpretation statements from aECG XML files.
 
 Usage:
-    from ecg_waveform_extraction.utils.aecg_parser import parse_aecg
+    from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 
     result = parse_aecg('path/to/file.aECG')
     # result['signals']  -> {'I': array, 'II': array, ...}
