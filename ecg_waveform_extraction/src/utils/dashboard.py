@@ -301,7 +301,7 @@ filterTable();
 if __name__ == '__main__':
     import sys
     out = sys.argv[1] if len(sys.argv) > 1 else (
-        'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output_rala_full/_p_qrs_t_wave'
+        'c:/LoyaltyLo/PythonProjects/ECG_engineering/ecg_waveform_extraction/output/rala_full/_p_qrs_t_wave'
     )
     path = build_dashboard(out)
     print(f'Dashboard generated: {path}')

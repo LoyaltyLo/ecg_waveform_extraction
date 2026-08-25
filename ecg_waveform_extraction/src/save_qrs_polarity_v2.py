@@ -25,8 +25,8 @@ from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-INPUT_DIR = str(Path(__file__).resolve().parent.parent / 'output_rala_full/_p_qrs_t_wave')
-OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output_rala_full/_qrs_polarity_v2')
+INPUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_p_qrs_t_wave')
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_qrs_polarity_v2')
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
 os.makedirs(OUT_DIR, exist_ok=True)
 

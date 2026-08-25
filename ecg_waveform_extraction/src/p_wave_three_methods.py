@@ -1148,12 +1148,12 @@ def main():
     if not aecg_files:
         print(f"\nNo aECG files found in {AECG_DIR}")
         print("Looking for alternative data sources...")
-        # Try output_trained directory for pre-loaded NPY files
-        alt_dir = Path(__file__).resolve().parent.parent / "output_trained"
+        # Try output/trained directory for pre-loaded NPY files
+        alt_dir = Path(__file__).resolve().parent.parent / "output/trained"
         if alt_dir.exists():
             rec_dirs = sorted([d for d in alt_dir.iterdir() if d.is_dir()])
             if rec_dirs:
-                print(f"Found {len(rec_dirs)} output_trained record dirs")
+                print(f"Found {len(rec_dirs)} output/trained record dirs")
                 # Process from raw NPY files
                 return process_from_output_trained(
                     rec_dirs[:5], segmenter, p_extractor,

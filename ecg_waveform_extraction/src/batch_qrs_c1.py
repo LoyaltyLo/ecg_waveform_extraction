@@ -33,7 +33,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 # Config
 # ---------------------------------------------------------------------------
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output_rala_full/_qrs_c1')
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_qrs_c1')
 MAX_SAMPLES = 4000
 
 HEADER_FONT = Font(name='Consolas', size=10, bold=True, color='FFFFFF')
