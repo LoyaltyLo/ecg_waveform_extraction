@@ -2,7 +2,7 @@
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os
 import json
@@ -38,9 +38,9 @@ def _jwrite(data, path):
 # =====================================================================
 # Config
 # =====================================================================
-DATA_DIR = str(Path(__file__).resolve().parent / 'data')
-MODEL_PATH = str(Path(__file__).resolve().parent / 'models/hsmm_trained.npz')
-OUT_DIR = str(Path(__file__).resolve().parent / 'output/test_only')
+DATA_DIR = str(Path(__file__).resolve().parent.parent / 'data')
+MODEL_PATH = str(Path(__file__).resolve().parent.parent / 'models/hsmm_trained.npz')
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/test_only')
 os.makedirs(OUT_DIR, exist_ok=True)
 
 MAX_SEC = 15.0

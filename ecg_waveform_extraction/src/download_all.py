@@ -9,7 +9,7 @@ import ssl
 import urllib.request
 import time
 
-DATA_DIR = str(Path(__file__).resolve().parent / 'data')
+DATA_DIR = str(Path(__file__).resolve().parent.parent / 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # ---- SSL setup ----

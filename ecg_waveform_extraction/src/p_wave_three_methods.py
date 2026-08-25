@@ -18,7 +18,7 @@ HSMM Stage 1 (beat/QRS detection):
 
 Usage
 ------
-    python -m ecg_waveform_extraction.p_wave_three_methods
+    python -m ecg_waveform_extraction.src.p_wave_three_methods
 
 Output
 ------
@@ -33,7 +33,7 @@ Output
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os, json, glob, textwrap, math
 import numpy as np
@@ -55,9 +55,9 @@ from ecg_waveform_extraction.src.extraction import PWaveExtractor, PWaveResult
 # =============================================================================
 # Config
 # =============================================================================
-MODEL_PATH = str(Path(__file__).resolve().parent / "models" / "hsmm_trained.npz")
+MODEL_PATH = str(Path(__file__).resolve().parent.parent / "models" / "hsmm_trained.npz")
 AECG_DIR = Path("C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG")
-OUTPUT_BASE = Path(__file__).resolve().parent / "output" / "three_methods"
+OUTPUT_BASE = Path(__file__).resolve().parent.parent / "output" / "three_methods"
 
 DEFAULT_FS = 250.0
 PHASOR_R_V = 0.002  # small constant for phasor transform
@@ -1149,7 +1149,7 @@ def main():
         print(f"\nNo aECG files found in {AECG_DIR}")
         print("Looking for alternative data sources...")
         # Try output_trained directory for pre-loaded NPY files
-        alt_dir = Path(__file__).resolve().parent / "output_trained"
+        alt_dir = Path(__file__).resolve().parent.parent / "output_trained"
         if alt_dir.exists():
             rec_dirs = sorted([d for d in alt_dir.iterdir() if d.is_dir()])
             if rec_dirs:

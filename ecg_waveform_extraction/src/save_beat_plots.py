@@ -8,7 +8,7 @@ Reads existing output/{record}/ data and produces:
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os
 import json
@@ -255,7 +255,7 @@ def process_record(rec_name: str, output_base: str):
 # Main
 # =====================================================================
 def main():
-    output_base = str(Path(__file__).resolve().parent / 'output/trained')
+    output_base = str(Path(__file__).resolve().parent.parent / 'output/trained')
     os.makedirs(output_base, exist_ok=True)
 
     # Find all record directories

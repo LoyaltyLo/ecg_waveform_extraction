@@ -2,14 +2,14 @@
 """Export limb lead reversal detection results to detailed Excel (.xlsx).
 
 Usage:
-    python -m ecg_waveform_extraction.export_reversal_xlsx
-    python -m ecg_waveform_extraction.export_reversal_xlsx --n 50
-    python -m ecg_waveform_extraction.export_reversal_xlsx --from-cache
+    python -m ecg_waveform_extraction.src.export_reversal_xlsx
+    python -m ecg_waveform_extraction.src.export_reversal_xlsx --n 50
+    python -m ecg_waveform_extraction.src.export_reversal_xlsx --from-cache
 """
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os, json, time, gc, argparse
 from collections import Counter
@@ -34,8 +34,8 @@ from openpyxl.formatting.rule import CellIsRule
 # Config
 # ---------------------------------------------------------------------------
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-CACHE_DIR = str(Path(__file__).resolve().parent / 'output_rala_full/_limb_leads')
-OUT_DIR = str(Path(__file__).resolve().parent / 'output_rala_full/_reversal')
+CACHE_DIR = str(Path(__file__).resolve().parent.parent / 'output_rala_full/_limb_leads')
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output_rala_full/_reversal')
 MAX_SAMPLES = 4000
 
 # ---------------------------------------------------------------------------

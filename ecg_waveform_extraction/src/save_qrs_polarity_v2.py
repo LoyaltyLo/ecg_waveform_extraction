@@ -9,7 +9,7 @@ No HSMM re-run needed — reads pre-computed .npy and boundary JSON.
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os, json, time, gc
 import numpy as np
@@ -25,8 +25,8 @@ from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-INPUT_DIR = str(Path(__file__).resolve().parent / 'output_rala_full/_p_qrs_t_wave')
-OUT_DIR = str(Path(__file__).resolve().parent / 'output_rala_full/_qrs_polarity_v2')
+INPUT_DIR = str(Path(__file__).resolve().parent.parent / 'output_rala_full/_p_qrs_t_wave')
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output_rala_full/_qrs_polarity_v2')
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
 os.makedirs(OUT_DIR, exist_ok=True)
 

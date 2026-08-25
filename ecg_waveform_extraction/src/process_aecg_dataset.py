@@ -14,7 +14,7 @@ Pipeline:
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os, json, re, time, gc
 from collections import defaultdict
@@ -36,7 +36,7 @@ from ecg_waveform_extraction.src.hsmm.hsmm_model import STATE_LABELS
 # Config
 # =====================================================================
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = str(Path(__file__).resolve().parent / 'output/rala')
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala')
 os.makedirs(OUT_DIR, exist_ok=True)
 
 SKIP_PLOTS = True  # Skip per-file plots for speed in batch mode

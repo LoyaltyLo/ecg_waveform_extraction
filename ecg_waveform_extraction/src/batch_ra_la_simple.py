@@ -8,12 +8,12 @@ Rule:
      - aVR positive → RA-LA REVERSAL
 
 Usage:
-    python -m ecg_waveform_extraction.batch_ra_la_simple --n 50
+    python -m ecg_waveform_extraction.src.batch_ra_la_simple --n 50
 """
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os, json, time, gc, argparse
 from collections import Counter
@@ -21,14 +21,14 @@ import numpy as np
 
 from ecg_waveform_extraction.src.limb_lead_processor import LimbLeadProcessor
 from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
-from ecg_waveform_extraction.export_reversal_xlsx import get_patient_name
+from ecg_waveform_extraction.src.export_reversal_xlsx import get_patient_name
 
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 # ---------------------------------------------------------------------------
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = str(Path(__file__).resolve().parent / 'output_rala_full/_ra_la_simple')
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output_rala_full/_ra_la_simple')
 MAX_SAMPLES = 4000
 
 HEADER_FONT = Font(name='Consolas', size=10, bold=True, color='FFFFFF')

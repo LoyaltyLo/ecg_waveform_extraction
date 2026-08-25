@@ -7,7 +7,7 @@ For each beat saves:
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os, json, re, time, gc
 import numpy as np
@@ -26,7 +26,7 @@ from ecg_waveform_extraction.src.utils.vis import STATE_COLORS
 from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = str(Path(__file__).resolve().parent / 'output/rala_full/_p_qrs_t_wave')
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_p_qrs_t_wave')
 os.makedirs(OUT_DIR, exist_ok=True)
 N_FILES = 50
 MAX_SAMPLES = 4000

@@ -5,14 +5,14 @@ Runs the LimbLeadReversalDetector on all .aECG records (using pre-computed
 6-lead HSMM data when available, or computing it on-the-fly).
 
 Usage:
-    python -m ecg_waveform_extraction.batch_reversal_detect --n 50
-    python -m ecg_waveform_extraction.batch_reversal_detect --n 10 --from-cache
-    python -m ecg_waveform_extraction.batch_reversal_detect --all --out results.json
+    python -m ecg_waveform_extraction.src.batch_reversal_detect --n 50
+    python -m ecg_waveform_extraction.src.batch_reversal_detect --n 10 --from-cache
+    python -m ecg_waveform_extraction.src.batch_reversal_detect --all --out results.json
 """
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os, json, time, gc, argparse
 from collections import Counter
@@ -34,8 +34,8 @@ from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 # Config
 # ---------------------------------------------------------------------------
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-CACHE_DIR = str(Path(__file__).resolve().parent / 'output_rala_full/_limb_leads')
-OUT_DIR = str(Path(__file__).resolve().parent / 'output_rala_full/_reversal')
+CACHE_DIR = str(Path(__file__).resolve().parent.parent / 'output_rala_full/_limb_leads')
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output_rala_full/_reversal')
 MAX_SAMPLES = 4000
 
 COLORS = {

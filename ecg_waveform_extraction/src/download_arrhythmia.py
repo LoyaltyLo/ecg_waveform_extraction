@@ -1,7 +1,7 @@
 """Download arrhythmia-specific PhysioNet databases for training diversity."""
 import os, ssl, urllib.request, time
 
-DATA_DIR = str(Path(__file__).resolve().parent / 'data')
+DATA_DIR = str(Path(__file__).resolve().parent.parent / 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 
 ssl_ctx = ssl.create_default_context()

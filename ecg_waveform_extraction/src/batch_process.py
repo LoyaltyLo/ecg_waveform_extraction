@@ -6,7 +6,7 @@ Saves per-record: segmentation, P-waves, metrics, plots, waveform data.
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os
 import json
@@ -27,9 +27,9 @@ import matplotlib.pyplot as plt
 # =====================================================================
 # Config
 # =====================================================================
-DATA_DIR = str(Path(__file__).resolve().parent / 'data')
-OUTPUT_DIR = str(Path(__file__).resolve().parent / 'output/trained')
-MODEL_PATH = str(Path(__file__).resolve().parent / 'models/hsmm_trained.npz')
+DATA_DIR = str(Path(__file__).resolve().parent.parent / 'data')
+OUTPUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/trained')
+MODEL_PATH = str(Path(__file__).resolve().parent.parent / 'models/hsmm_trained.npz')
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 MAX_DURATION_SEC = 15.0

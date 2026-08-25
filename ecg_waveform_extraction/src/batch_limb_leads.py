@@ -7,14 +7,14 @@ per-lead QRS polarity, P-wave metrics, and cross-lead summaries.
 This is the data foundation for limb lead reversal detection.
 
 Usage:
-    python -m ecg_waveform_extraction.batch_limb_leads
-    python -m ecg_waveform_extraction.batch_limb_leads --n 20
-    python -m ecg_waveform_extraction.batch_limb_leads --n 10 --lead I,II,AVR
+    python -m ecg_waveform_extraction.src.batch_limb_leads
+    python -m ecg_waveform_extraction.src.batch_limb_leads --n 20
+    python -m ecg_waveform_extraction.src.batch_limb_leads --n 10 --lead I,II,AVR
 """
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os, json, time, gc, argparse
 from collections import Counter, defaultdict
@@ -33,7 +33,7 @@ from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 # Config
 # ---------------------------------------------------------------------------
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = str(Path(__file__).resolve().parent / 'output_rala_full/_limb_leads')
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output_rala_full/_limb_leads')
 MAX_SAMPLES = 4000
 
 POLARITY_COLORS = {

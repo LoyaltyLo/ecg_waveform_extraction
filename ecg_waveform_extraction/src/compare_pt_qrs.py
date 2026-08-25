@@ -9,7 +9,7 @@ the existing HSMM output. For each beat detected by both methods:
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os, json, time, gc, re
 from collections import Counter, defaultdict
@@ -32,7 +32,7 @@ from ecg_waveform_extraction.src.extraction.qrs_refiner import (
 # Config
 # =====================================================================
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = str(Path(__file__).resolve().parent / 'output_rala_full/_hsmm_vs_pt')
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output_rala_full/_hsmm_vs_pt')
 os.makedirs(OUT_DIR, exist_ok=True)
 N_FILES = 50
 MAX_SAMPLES = 4000

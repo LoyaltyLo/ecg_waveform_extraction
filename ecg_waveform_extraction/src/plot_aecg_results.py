@@ -10,7 +10,7 @@ Reads all completed result.json files from output/rala/ and generates:
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os, json
 from collections import defaultdict
@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 # ---- Config ----
-OUT = str(Path(__file__).resolve().parent / 'output/rala')
+OUT = str(Path(__file__).resolve().parent.parent / 'output/rala')
 PLOTS_DIR = os.path.join(OUT, '_summary_plots')
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
@@ -338,7 +338,7 @@ for row_idx, examples in enumerate([best_5, worst_5]):
 
         try:
             # Reload and re-segment
-            from ecg_waveform_extraction.process_aecg_dataset import parse_aecg
+            from ecg_waveform_extraction.src.process_aecg_dataset import parse_aecg
             aecg = parse_aecg(fpath)
             sig = aecg['signals'].get('II')
             if sig is None:

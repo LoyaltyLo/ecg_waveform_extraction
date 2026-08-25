@@ -8,12 +8,12 @@ For each record:
   4. XLSX export
 
 Usage:
-    python -m ecg_waveform_extraction.batch_qrs_c1 --n 50
+    python -m ecg_waveform_extraction.src.batch_qrs_c1 --n 50
 """
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os, json, time, gc, argparse
 from collections import Counter
@@ -24,7 +24,7 @@ from ecg_waveform_extraction.src.limb_lead_processor import (
 )
 from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 from ecg_waveform_extraction.src.plot_qrs_c1 import save_qrs_c1_plots
-from ecg_waveform_extraction.export_reversal_xlsx import get_patient_name
+from ecg_waveform_extraction.src.export_reversal_xlsx import get_patient_name
 
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -33,7 +33,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 # Config
 # ---------------------------------------------------------------------------
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = str(Path(__file__).resolve().parent / 'output_rala_full/_qrs_c1')
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output_rala_full/_qrs_c1')
 MAX_SAMPLES = 4000
 
 HEADER_FONT = Font(name='Consolas', size=10, bold=True, color='FFFFFF')

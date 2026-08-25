@@ -11,7 +11,7 @@ Format matches output/test_only/<record>/ exactly.
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os, json, time, gc, traceback
 import numpy as np
@@ -29,7 +29,7 @@ from ecg_waveform_extraction.src.utils.vis import plot_segmentation, plot_p_wave
 
 # ---- Config ----
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = str(Path(__file__).resolve().parent / 'output/rala_full')
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full')
 os.makedirs(OUT_DIR, exist_ok=True)
 
 MAX_SAMPLES = 4000        # 4s for speed

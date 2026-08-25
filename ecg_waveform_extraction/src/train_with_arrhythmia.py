@@ -9,7 +9,7 @@ Strategy:
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os, json, time, gc
 from collections import Counter, defaultdict
@@ -24,9 +24,9 @@ from ecg_waveform_extraction.src.hsmm.hsmm_model import STATE_LABELS
 # =====================================================================
 # Config
 # =====================================================================
-DATA_DIR = str(Path(__file__).resolve().parent / 'data')
-MODEL_DIR = str(Path(__file__).resolve().parent / 'models')
-OUT_DIR = str(Path(__file__).resolve().parent / 'output/arrhythmia')
+DATA_DIR = str(Path(__file__).resolve().parent.parent / 'data')
+MODEL_DIR = str(Path(__file__).resolve().parent.parent / 'models')
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/arrhythmia')
 os.makedirs(MODEL_DIR, exist_ok=True)
 os.makedirs(OUT_DIR, exist_ok=True)
 

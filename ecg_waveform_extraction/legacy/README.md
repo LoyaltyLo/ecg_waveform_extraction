@@ -23,6 +23,7 @@
 注意：本目录不是 Python 包（无 `__init__.py`），脚本不能通过 `python -m ecg_waveform_extraction.legacy.xxx` 运行；
 且部分脚本含机器特定绝对路径或已知 bug，仅作参考。
 
-当前主线：核心库在 `src/`（`limb_lead_processor.py` / `limb_lead_reversal.py` / `chest_lead_analyzer.py` +
-`preprocessing` / `features` / `hsmm` / `segmentation` / `extraction` / `utils` 子包），
-入口脚本在包根：`batch_limb_leads.py` / `batch_ra_la_simple.py` / `batch_reversal_detect.py` / `export_reversal_xlsx.py`。
+当前主线：全部代码在 `src/`（核心库 `limb_lead_processor.py` / `limb_lead_reversal.py` / `chest_lead_analyzer.py` +
+`preprocessing` / `features` / `hsmm` / `segmentation` / `extraction` / `utils` 子包，
+入口脚本 `batch_limb_leads.py` / `batch_ra_la_simple.py` / `batch_reversal_detect.py` / `export_reversal_xlsx.py` 等，
+运行方式 `python -m ecg_waveform_extraction.src.batch_limb_leads`）。

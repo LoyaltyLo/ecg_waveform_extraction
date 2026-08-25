@@ -1,9 +1,13 @@
-"""Core library code for ECG waveform extraction.
+"""All source code for ECG waveform extraction.
 
 Subpackages: preprocessing, features, hsmm, segmentation, extraction, utils.
 Core modules: limb_lead_processor, limb_lead_reversal, chest_lead_analyzer,
 plot_segmentation, plot_qrs_c1.
+Entry-point scripts: batch_*, train_*, eval_*, export_*, download_*,
+process_*, plot_*, save_*, compare_*, p_wave_three_methods.
 
-Entry-point scripts (batch_*, train_*, eval_*, export_*, download_*) live in
-the package root, one level up.
+Run entry points as modules from the repo root (ECG_engineering), e.g.:
+    python -m ecg_waveform_extraction.src.batch_limb_leads --n 5
+Data (data/), models (models/), outputs (output*/) and tests/ live at the
+package root, one level up; scripts anchor them via Path(__file__).
 """
