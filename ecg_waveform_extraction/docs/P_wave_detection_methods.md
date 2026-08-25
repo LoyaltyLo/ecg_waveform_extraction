@@ -164,7 +164,7 @@ delta_t(j) = max_d [ p_j(d) * b_j(o_{t-d+1:t}) * max(pi_j * 1{start=0}, max_i de
 
 **关键文献。**
 - Hughes, N.P. & Tarassenko, L. (2003). "Automated QT interval analysis with a hidden semi-Markov model." *Computers in Cardiology*, 30, 321-324.
-- **本项目的实现** (`hsmm/`)：具有GMM观测密度和截断高斯时长先验的9状态左-右HSMM，使用向量化Viterbi解码。项目还在 `PWaveExtractor._build_p_wave_model()` 中实现了专门的三状态聚焦HSMM（ISO_before -> P -> PR_after），用于初始心搏分割后的精细化P波边界提取。
+- **本项目的实现** (`src/hsmm/`)：具有GMM观测密度和截断高斯时长先验的9状态左-右HSMM，使用向量化Viterbi解码。项目还在 `PWaveExtractor._build_p_wave_model()` 中实现了专门的三状态聚焦HSMM（ISO_before -> P -> PR_after），用于初始心搏分割后的精细化P波边界提取。
 
 **优点。**
 - 显式时长建模产生比HMM更符合生理的分割结果。
@@ -484,8 +484,8 @@ I-BEAT模型（Plaza-Seco等，EMBC 2025，同行评审）以强大的评估方�
 15. Park, J. 等. (2025). "Comparative Analysis of CNN and Transformer Models for ECG Delineation." *Proceedings of Machine Learning Research*, 287.
 
 ### 项目内部文档
-16. 本项目：`ecg_waveform_extraction/hsmm/`——具有GMM观测、截断高斯时长和向量化Viterbi解码的9状态HSMM实现。
-17. 本项目：`ecg_waveform_extraction/extraction/p_wave_extractor.py`——结合聚焦HSMM、模板匹配后备、导数边界精细化、缺失检测和形态分类的多阶段P波提取器。
+16. 本项目：`ecg_waveform_extraction/src/hsmm/`——具有GMM观测、截断高斯时长和向量化Viterbi解码的9状态HSMM实现。
+17. 本项目：`ecg_waveform_extraction/src/extraction/p_wave_extractor.py`——结合聚焦HSMM、模板匹配后备、导数边界精细化、缺失检测和形态分类的多阶段P波提取器。
 
 ---
 

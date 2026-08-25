@@ -108,11 +108,11 @@ Flag beats where P-duration deviates > 3σ from the median as suspicious.
 
 | Step | Module | Expected Gain |
 |------|--------|---------------|
-| 1. GMM init fix | p_wave_extractor.py | +30% boundary accuracy |
-| 2. Confidence rewrite | p_wave_extractor.py | meaningful quality scores |
-| 3. Slope zero-crossing | p_wave_extractor.py (new method) | MAE ↓ 5–10ms |
-| 4. Absence detection | p_wave_extractor.py | AFib handling |
-| 5. Morphology classify | p_wave_analyzer.py | new clinical feature |
+| 1. GMM init fix | src/extraction/p_wave_extractor.py | +30% boundary accuracy |
+| 2. Confidence rewrite | src/extraction/p_wave_extractor.py | meaningful quality scores |
+| 3. Slope zero-crossing | src/extraction/p_wave_extractor.py (new method) | MAE ↓ 5–10ms |
+| 4. Absence detection | src/extraction/p_wave_extractor.py | AFib handling |
+| 5. Morphology classify | src/extraction/p_wave_analyzer.py | new clinical feature |
 | 6. Multi-lead fusion | extractors/p_wave_multi_lead.py | aECG accuracy ↑ |
-| 7. Adaptive priors | p_wave_extractor.py | +HR robustness |
-| 8. Consistency post-process | p_wave_extractor.py (postprocess method) | outlier removal |
+| 7. Adaptive priors | src/extraction/p_wave_extractor.py | +HR robustness |
+| 8. Consistency post-process | src/extraction/p_wave_extractor.py (postprocess method) | outlier removal |
