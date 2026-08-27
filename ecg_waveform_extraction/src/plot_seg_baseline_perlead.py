@@ -32,6 +32,7 @@ from ecg_waveform_extraction.src.plot_segmentation import (
 from ecg_waveform_extraction.src.plot_ecg_baseline import estimate_baseline
 
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
+# NOTE: the aECG XML has no <scale>/<units> tag — raw values are microvolts.
 CACHE_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_limb_leads')
 OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_seg_baseline_perlead')
 MAX_SAMPLES = 4000
@@ -68,9 +69,9 @@ def plot_lead(rec: str, ln: str, raw: np.ndarray, fs: float,
 
     n_neg = sum(1 for b in beats if b.get('polarity') == 'negative')
     n_pos = len(beats) - n_neg
-    ax.set_title(f'{rec} — {ln}   wander pp = {np.ptp(base):.3f} mV   '
+    ax.set_title(f'{rec} — {ln}   wander pp = {np.ptp(base):.3f} µV   '
                  f'QRS: −{n_neg}/+{n_pos}', fontsize=11)
-    ax.set_ylabel('mV', fontsize=9)
+    ax.set_ylabel('µV', fontsize=9)
     ax.set_xlabel('Time (s)', fontsize=9)
     ax.tick_params(labelsize=8)
     ax.grid(True, alpha=0.12)

@@ -86,9 +86,9 @@ def plot_record(rec: str, rec_dir: str, aecg: dict, save_path: str, dpi: int = 1
         n_neg = sum(1 for b in beats if b.get('polarity') == 'negative')
         n_pos = len(beats) - n_neg
 
-        ax.set_title(f'{ln}   wander pp = {np.ptp(base):.3f} mV   '
+        ax.set_title(f'{ln}   wander pp = {np.ptp(base):.3f} µV   '
                      f'QRS: −{n_neg}/+{n_pos}', fontsize=10)
-        ax.set_ylabel('mV', fontsize=8)
+        ax.set_ylabel('µV', fontsize=8)
         ax.tick_params(labelsize=8)
         ax.grid(True, alpha=0.12)
 

@@ -26,6 +26,7 @@ from scipy.signal import butter, filtfilt
 from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
+# NOTE: the aECG XML has no <scale>/<units> tag — raw values are microvolts.
 OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_baseline')
 MAX_SAMPLES = 4000
 
@@ -70,8 +71,8 @@ def plot_record_baseline(aecg: dict, save_path: str, dpi: int = 130):
                 label='corrected (raw - baseline)')
         ax.axhline(0.0, color='k', lw=0.6, ls=':', alpha=0.6)
 
-        ax.set_title(f'{ln}   wander pp = {np.ptp(base):.3f} mV', fontsize=10)
-        ax.set_ylabel('mV', fontsize=8)
+        ax.set_title(f'{ln}   wander pp = {np.ptp(base):.3f} µV', fontsize=10)
+        ax.set_ylabel('µV', fontsize=8)
         ax.tick_params(labelsize=8)
         ax.grid(True, alpha=0.15)
 
