@@ -46,7 +46,7 @@ from ecg_spectrum_analysis.src.plot_spectrogram import (
 # ---------------------------------------------------------------------------
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
 OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output_spectrograms')
-MAX_SAMPLES = 4000  # ~16 s at 250 Hz
+MAX_SAMPLES = 16000  # ~16 s at 1000 Hz (actual dataset fs; auto-clipped if record is shorter)
 ALL_LEADS = ['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
 
