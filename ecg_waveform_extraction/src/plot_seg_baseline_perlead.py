@@ -7,7 +7,8 @@ saves, for every cached record and lead, a single-lead figure with:
   - estimated baseline wander (0.5 Hz low-pass, red dashed)
   - three shaded bands only: P (blue), QRS (red, Q+R+S merged), T (green)
 
-Layout: output/rala_full/_seg_baseline_perlead/<rec>/<rec>_<lead>.png
+Layout: output/rala_full/_seg_baseline_perlead/<lead>/<rec>_<lead>.png
+(grouped by lead: I/, II/, III/, AVR/, AVL/, AVF/ — 200 records each)
 
 Usage:
     python -m ecg_waveform_extraction.src.plot_seg_baseline_perlead
@@ -127,12 +128,12 @@ def main():
                   flush=True)
             continue
 
-        out_rec = os.path.join(OUT_DIR, rec)
-        os.makedirs(out_rec, exist_ok=True)
         for ln in leads:
             states = np.load(os.path.join(rec_dir, f'lead_{ln}',
                                           'state_labels.npy'))
-            save_path = os.path.join(out_rec, f'{rec}_{ln}.png')
+            out_ln = os.path.join(OUT_DIR, ln)
+            os.makedirs(out_ln, exist_ok=True)
+            save_path = os.path.join(out_ln, f'{rec}_{ln}.png')
             try:
                 plot_lead(rec, ln, aecg['signals'].get(ln), aecg['fs'],
                           states, save_path)
