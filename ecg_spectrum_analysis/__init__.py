@@ -1,20 +1,9 @@
-"""ECG Spectrum Analysis Package.
+"""ECG Spectrum Analysis - time-frequency analysis of ECG signals.
 
-Provides tools for converting ECG time-domain signals into frequency-domain
-representations: STFT spectrograms, power spectral density (PSD), and
-continuous wavelet transform (CWT) scalograms.
+All source code lives in src/ (mirrors ecg_waveform_extraction layout).
+Run entry points as modules from the workspace root (ECG_engineering), e.g.:
+    python -m ecg_spectrum_analysis.src.batch_spectrogram --n 10
+Output images go under output_spectrograms/ at the package root.
 """
 
-from .spectrogram import (
-    compute_spectrogram,
-    compute_psd,
-    compute_scalogram,
-    ECG_Spectrogram,
-)
-
-__all__ = [
-    "compute_spectrogram",
-    "compute_psd",
-    "compute_scalogram",
-    "ECG_Spectrogram",
-]
+__version__ = "0.1.0"

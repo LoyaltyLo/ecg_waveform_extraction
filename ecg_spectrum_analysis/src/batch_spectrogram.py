@@ -17,14 +17,14 @@ Output structure per record:
         └── psd_comparison_<record>.png         # 12-lead PSD overlay
 
 Usage:
-    python -m ecg_spectrum_analysis.batch_spectrogram --n 10
-    python -m ecg_spectrum_analysis.batch_spectrogram --n 50 --method stft
-    python -m ecg_spectrum_analysis.batch_spectrogram --n 20 --no-waveform
+    python -m ecg_spectrum_analysis.src.batch_spectrogram --n 10
+    python -m ecg_spectrum_analysis.src.batch_spectrogram --n 50 --method stft
+    python -m ecg_spectrum_analysis.src.batch_spectrogram --n 20 --no-waveform
 """
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import os, json, time, gc, argparse
 import numpy as np
@@ -34,18 +34,18 @@ matplotlib.use('Agg')
 from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 from ecg_waveform_extraction.src.preprocessing.filters import ECGPreprocessor
 
-from ecg_spectrum_analysis.spectrogram import (
+from ecg_spectrum_analysis.src.spectrogram import (
     compute_spectrogram, compute_psd, compute_scalogram,
     ECG_Spectrogram, band_power,
 )
-from ecg_spectrum_analysis.plot_spectrogram import (
+from ecg_spectrum_analysis.src.plot_spectrogram import (
     plot_waveform_with_spectrum, plot_multi_lead_spectrograms,
     plot_psd_comparison, save_figure,
 )
 
 # ---------------------------------------------------------------------------
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = str(Path(__file__).resolve().parent / 'output_spectrograms')
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output_spectrograms')
 MAX_SAMPLES = 4000  # ~16 s at 250 Hz
 ALL_LEADS = ['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
@@ -196,9 +196,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python -m ecg_spectrum_analysis.batch_spectrogram --n 10
-  python -m ecg_spectrum_analysis.batch_spectrogram --n 50 --method stft --no-per-lead
-  python -m ecg_spectrum_analysis.batch_spectrogram --n 5 --method all --dpi 200
+  python -m ecg_spectrum_analysis.src.batch_spectrogram --n 10
+  python -m ecg_spectrum_analysis.src.batch_spectrogram --n 50 --method stft --no-per-lead
+  python -m ecg_spectrum_analysis.src.batch_spectrogram --n 5 --method all --dpi 200
         """,
     )
     parser.add_argument('--n', type=int, default=10,
