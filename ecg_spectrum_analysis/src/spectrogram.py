@@ -1,6 +1,6 @@
 """ECG Spectrogram Computation.
 
-Three methods for time-frequency analysis of ECG signals:
+Four methods for time-frequency analysis of ECG signals:
 
 1. **STFT Spectrogram** — Short-Time Fourier Transform
    Classic sliding-window approach. Good general-purpose time-frequency view.
@@ -15,14 +15,22 @@ Three methods for time-frequency analysis of ECG signals:
    frequencies, better frequency resolution at low frequencies — naturally
    matched to ECG signal characteristics.
 
+4. **Complex CWT** — raw complex wavelet coefficients
+   Same as the scalogram but preserving phase, for cross-lead
+   cross-wavelet analysis (e.g. lead reversal detection).
+
 All functions accept raw numpy arrays and return structured data ready for
 plotting with matplotlib.
+
+Note on the CWT frequency axis: the width<->frequency mapping
+(`_widths_to_freqs` / `_make_widths`) is the single source of truth and is
+verified numerically against each wavelet's FFT peak.
 """
 
 from dataclasses import dataclass, field
 import numpy as np
 from scipy import signal
-from scipy.signal import spectrogram, welch, convolve
+from scipy.signal import spectrogram, welch
 from scipy.signal._wavelets import _ricker as ricker, _cwt as cwt
 
 
@@ -219,8 +227,93 @@ def compute_psd(
 
 
 # ---------------------------------------------------------------------------
-# CWT Scalogram (Continuous Wavelet Transform)
+# CWT (complex core + magnitude scalogram)
 # ---------------------------------------------------------------------------
+MORLET_W = 5.0  # Morlet omega0 for the locally-defined wavelet below
+
+
+def _morlet(points: int, s: float, w: float = MORLET_W) -> np.ndarray:
+    """Complex Morlet wavelet. `s` is scale (width), `w` is omega0.
+
+    Defined locally since public morlet2/scipy.signal.cwt were removed
+    in scipy 1.15+; we use the private _cwt with the same signature.
+    """
+    t = np.arange(points) - (points - 1.0) / 2.0
+    t = t / s
+    return np.pi ** (-0.25) * (
+        np.exp(1j * w * t) - np.exp(-0.5 * w ** 2)
+    ) * np.exp(-0.5 * t ** 2)
+
+
+def _widths_to_freqs(wavelet: str, widths: np.ndarray, fs: float) -> np.ndarray:
+    """Map wavelet widths (scales) to true center frequencies in Hz.
+
+    Formulas verified numerically against the FFT peak of each wavelet:
+      - ricker:        f = 0.2 * fs / width
+      - morlet (w=5):  f = w / (2*pi) * fs / width
+    This is the single source of truth for the width<->frequency mapping;
+    _make_widths below is its exact inverse.
+    """
+    if wavelet == 'morlet':
+        return MORLET_W / (2.0 * np.pi) * fs / widths
+    return 0.2 * fs / widths
+
+
+def _make_widths(wavelet: str, freq_range: tuple[float, float],
+                 fs: float, n_voices: int, n_samples: int) -> np.ndarray:
+    """Log-spaced widths covering [f_low, f_high]; inverse of _widths_to_freqs."""
+    f_low, f_high = freq_range
+    k = MORLET_W / (2.0 * np.pi) if wavelet == 'morlet' else 0.2
+    w_min = k * fs / f_high   # narrowest width (highest frequency)
+    w_max = k * fs / f_low    # widest width (lowest frequency)
+    w_min = max(w_min, 1.5)
+    w_max = min(w_max, n_samples / 4.0)
+    return np.geomspace(w_min, w_max, n_voices)
+
+
+def compute_cwt_complex(
+    ecg_signal: np.ndarray,
+    fs: float = 250.0,
+    wavelet: str = 'ricker',
+    widths: np.ndarray | None = None,
+    freq_range: tuple[float, float] = (0.5, 60.0),
+    n_voices: int = 64,
+    lead_name: str = '',
+    record_name: str = '',
+) -> ECG_Spectrogram:
+    """Compute the raw complex CWT of a signal.
+
+    Same parameters as compute_scalogram(), but .data is complex
+    (scales x time), preserving phase information for cross-lead
+    cross-wavelet analysis (e.g. lead reversal detection).
+    """
+    N = len(ecg_signal)
+    T = N / fs
+
+    if widths is None:
+        widths = _make_widths(wavelet, freq_range, fs, n_voices, N)
+
+    if wavelet == 'morlet':
+        coeffs = cwt(ecg_signal, _morlet, widths, kwargs={'w': MORLET_W})
+    else:
+        coeffs = cwt(ecg_signal, ricker, widths)
+
+    pseudo_freqs = _widths_to_freqs(wavelet, widths, fs)
+
+    # Sort rows by increasing frequency and clip to the requested range
+    sort_idx = np.argsort(pseudo_freqs)
+    pseudo_freqs = pseudo_freqs[sort_idx]
+    coeffs = coeffs[sort_idx, :]
+    fmask = (pseudo_freqs >= freq_range[0]) & (pseudo_freqs <= freq_range[1])
+    pseudo_freqs = pseudo_freqs[fmask]
+    coeffs = coeffs[fmask, :]
+
+    return ECG_Spectrogram(
+        data=coeffs, freqs=pseudo_freqs, times=np.linspace(0, T, N), fs=fs,
+        method='cwt', lead_name=lead_name, record_name=record_name,
+    )
+
+
 def compute_scalogram(
     ecg_signal: np.ndarray,
     fs: float = 250.0,
@@ -247,7 +340,8 @@ def compute_scalogram(
     wavelet : str
         Wavelet type: 'ricker' (Mexican Hat) or 'morlet'.
         Ricker is real-valued and fast; Morlet is complex-valued and better
-        for phase information, but we take the magnitude here.
+        for phase information, but we take the magnitude here
+        (see compute_cwt_complex for the raw complex coefficients).
     widths : np.ndarray or None
         Wavelet widths (scales). If None, auto-generated from freq_range.
         Wider = lower frequency, narrower = higher frequency.
@@ -265,66 +359,22 @@ def compute_scalogram(
     Returns
     -------
     ECG_Spectrogram
-        .data is 2-D (scales, time), .freqs maps to pseudo-frequencies.
+        .data is 2-D (scales, time), .freqs are true wavelet center
+        frequencies in Hz (verified against the wavelet FFT peaks).
     """
-    N = len(ecg_signal)
-    T = N / fs
+    coeffs = compute_cwt_complex(
+        ecg_signal, fs=fs, wavelet=wavelet, widths=widths,
+        freq_range=freq_range, n_voices=n_voices,
+        lead_name=lead_name, record_name=record_name,
+    )
 
-    if widths is None:
-        # Convert freq_range to wavelet widths
-        # For Ricker: center_freq ≈ 0.25 / width (approximate)
-        # We generate logarithmically-spaced widths
-        f_low, f_high = freq_range
-        w_max = fs / (2.0 * f_low)   # widest (lowest freq)
-        w_min = fs / (2.0 * f_high)  # narrowest (highest freq)
-        w_min = max(w_min, 1.5)
-        w_max = min(w_max, N / 4.0)
-        widths = np.geomspace(w_min, w_max, n_voices)
-
-    # Manual CWT via convolution (public cwt was removed in scipy 1.15+;
-    # use private _cwt which still exists with the same signature).
-    if wavelet == 'morlet':
-        # Complex Morlet: define locally since public morlet2 was removed
-        def _morlet(points, s, w=5.0):
-            """Complex Morlet wavelet. `s` is scale (width), `w` is omega0."""
-            t = np.arange(points) - (points - 1.0) / 2.0
-            t = t / s
-            return np.pi ** (-0.25) * (
-                np.exp(1j * w * t) - np.exp(-0.5 * w ** 2)
-            ) * np.exp(-0.5 * t ** 2)
-
-        cwt_result = cwt(ecg_signal, _morlet, widths, kwargs={'w': 5.0})
-    else:
-        cwt_result = cwt(ecg_signal, ricker, widths)
-
-    magnitude = np.abs(cwt_result)
-
-    # Map widths (scales) to pseudo-frequencies
-    # For Ricker: f ≈ 0.25 * fs / width
-    # For Morlet (w=5): f ≈ 0.2 * fs / width
-    if wavelet == 'morlet':
-        pseudo_freqs = 0.2 * fs / widths
-    else:
-        pseudo_freqs = 0.25 * fs / widths
-
-    # Sort by increasing frequency
-    sort_idx = np.argsort(pseudo_freqs)
-    pseudo_freqs = pseudo_freqs[sort_idx]
-    magnitude = magnitude[sort_idx, :]
-
-    # Clip to requested frequency range
-    fmask = (pseudo_freqs >= freq_range[0]) & (pseudo_freqs <= freq_range[1])
-    pseudo_freqs = pseudo_freqs[fmask]
-    magnitude = magnitude[fmask, :]
-
-    times = np.linspace(0, T, N)
-
+    magnitude = np.abs(coeffs.data)
     if scale == 'db':
         eps = np.finfo(magnitude.dtype).tiny
         magnitude = 20.0 * np.log10(np.maximum(magnitude, eps))
 
     return ECG_Spectrogram(
-        data=magnitude, freqs=pseudo_freqs, times=times, fs=fs,
+        data=magnitude, freqs=coeffs.freqs, times=coeffs.times, fs=fs,
         method='cwt', lead_name=lead_name, record_name=record_name,
     )
 

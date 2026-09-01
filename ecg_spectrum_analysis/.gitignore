@@ -1,3 +1,2 @@
-# Ignore generated spectrogram outputs (keep folder structure)
-output_spectrograms/*
-!output_spectrograms/.gitkeep
+# Ignore all generated outputs (results live under output/)
+output/

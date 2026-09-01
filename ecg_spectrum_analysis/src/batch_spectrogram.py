@@ -5,7 +5,7 @@ Generates STFT spectrograms, PSD plots, and CWT scalograms for all 12 leads
 from aECG XML files.
 
 Output structure per record:
-    output_spectrograms/
+    output/spectrograms/
     └── <record_id>/
         ├── I/
         │   ├── <record>_I_waveform_stft.png   # waveform + STFT spectrogram
@@ -45,7 +45,7 @@ from ecg_spectrum_analysis.src.plot_spectrogram import (
 
 # ---------------------------------------------------------------------------
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
-OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output_spectrograms')
+OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output' / 'spectrograms')
 MAX_SAMPLES = 16000  # ~16 s at 1000 Hz (actual dataset fs; auto-clipped if record is shorter)
 ALL_LEADS = ['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
