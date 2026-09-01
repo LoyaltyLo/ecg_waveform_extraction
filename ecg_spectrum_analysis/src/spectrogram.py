@@ -294,7 +294,7 @@ def compute_cwt_complex(
         widths = _make_widths(wavelet, freq_range, fs, n_voices, N)
 
     if wavelet == 'morlet':
-        coeffs = cwt(ecg_signal, _morlet, widths, kwargs={'w': MORLET_W})
+        coeffs = cwt(ecg_signal, _morlet, widths, w=MORLET_W)
     else:
         coeffs = cwt(ecg_signal, ricker, widths)
 
