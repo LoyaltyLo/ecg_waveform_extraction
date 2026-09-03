@@ -36,7 +36,7 @@ from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
 CACHE_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_limb_leads')
 OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_reversal')
-MAX_SAMPLES = 4000
+MAX_SAMPLES = 16000
 
 COLORS = {
     'ra_la': '#f44336', 'ra_ll': '#ff9800', 'la_ll': '#9c27b0',

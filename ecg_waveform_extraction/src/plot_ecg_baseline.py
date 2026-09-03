@@ -28,7 +28,7 @@ from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
 # NOTE: the aECG XML has no <scale>/<units> tag — raw values are microvolts.
 OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_baseline')
-MAX_SAMPLES = 4000
+MAX_SAMPLES = 16000
 
 LEAD_ORDER = ['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 

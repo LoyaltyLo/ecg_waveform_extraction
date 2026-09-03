@@ -34,7 +34,7 @@ AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
 # NOTE: the aECG XML has no <scale>/<units> tag — raw values are microvolts.
 CACHE_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_limb_leads')
 OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_seg_baseline_perlead')
-MAX_SAMPLES = 4000
+MAX_SAMPLES = 16000
 
 LEAD_ORDER = ['I', 'II', 'III', 'AVR', 'AVL', 'AVF']
 C_BASE, C_CORR = '#f44336', '#1565c0'

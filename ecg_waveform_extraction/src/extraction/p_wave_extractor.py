@@ -154,8 +154,13 @@ class PWaveExtractor:
         pr_samples = int(np.round(pr_dur_ms / 1000.0 * self.fs))
 
         from ..hsmm.distributions import DurationDistribution
-        model.dur_dists[0] = DurationDistribution(mu=15, sigma=15, d_min=2)
-        model.dur_dists[1] = DurationDistribution(mu=p_samples, sigma=max(p_samples*0.25, 3), d_min=4)
+        # ISO_before prior: ~60 ms (was hard-coded mu=sigma=15 SAMPLES, which
+        # is 60 ms at 250 Hz but only 15 ms at 1 kHz). P d_min: ~16 ms
+        # (was a flat 4 samples). Sigma floors stay sample-domain.
+        iso_samples = max(2, int(np.round(0.06 * self.fs)))
+        p_dmin = max(2, int(np.round(0.016 * self.fs)))
+        model.dur_dists[0] = DurationDistribution(mu=iso_samples, sigma=iso_samples, d_min=2)
+        model.dur_dists[1] = DurationDistribution(mu=p_samples, sigma=max(p_samples*0.25, 3), d_min=p_dmin)
         model.dur_dists[2] = DurationDistribution(mu=pr_samples, sigma=max(pr_samples*0.3, 4), d_min=1)
 
         model._compute_D_max()
@@ -221,7 +226,7 @@ class PWaveExtractor:
         win_start = max(0, beat.p_onset - self._window_before)
         win_end = min(T - 1, beat.p_offset + self._window_after)
 
-        if win_end - win_start < 10:
+        if win_end - win_start < max(10, int(round(0.04 * self.fs))):  # >= 40 ms
             return self._fallback(ecg, beat, "Window too small")
 
         ecg_window = ecg[win_start:win_end + 1]
@@ -261,7 +266,8 @@ class PWaveExtractor:
         labels = result["state_labels"]
 
         p_indices = np.where(labels == 1)[0]
-        if len(p_indices) < 3:
+        min_p_state = max(3, int(round(0.012 * self.fs)))  # >= ~12 ms of P state
+        if len(p_indices) < min_p_state:
             if self.enable_template_fallback and template_pool:
                 pw = self._template_match(ecg_window, win_start, beat, template_pool)
                 if pw is not None:
@@ -454,6 +460,11 @@ class PWaveExtractor:
         T = len(ecg_window)
         d1 = np.gradient(ecg_window)
 
+        # Walk bounds in ms (80 ms onset / 32 ms quiescent search): the old
+        # flat 20/8 SAMPLES were sized for 250 Hz and quartered at 1 kHz.
+        onset_walk = int(round(0.08 * self.fs))
+        quiescent_walk = int(round(0.032 * self.fs))
+
         # Baseline slope statistics from the quiet early part of the window
         baseline_end = min(T // 4, p_onset_win - 1)
         if baseline_end < 5:
@@ -465,31 +476,31 @@ class PWaveExtractor:
 
         # ---- Refine onset: walk left from p_onset_win ----
         refined_onset = p_onset_win
-        for i in range(p_onset_win, max(2, p_onset_win - 20), -1):
+        for i in range(p_onset_win, max(2, p_onset_win - onset_walk), -1):
             if abs(d1[i]) <= threshold:
                 refined_onset = i
             else:
                 break
         # Walk a few more samples to the most quiescent point
-        for i in range(refined_onset, max(2, refined_onset - 8), -1):
+        for i in range(refined_onset, max(2, refined_onset - quiescent_walk), -1):
             if abs(d1[i]) <= threshold and abs(d1[i - 1]) <= threshold:
                 refined_onset = i
                 break
 
         # ---- Refine offset: walk right from p_offset_win ----
         refined_offset = p_offset_win
-        for i in range(p_offset_win, min(T - 2, p_offset_win + 20)):
+        for i in range(p_offset_win, min(T - 2, p_offset_win + onset_walk)):
             if abs(d1[i]) <= threshold:
                 refined_offset = i
             else:
                 break
-        for i in range(refined_offset, min(T - 2, refined_offset + 8)):
+        for i in range(refined_offset, min(T - 2, refined_offset + quiescent_walk)):
             if abs(d1[i]) <= threshold and abs(d1[i + 1]) <= threshold:
                 refined_offset = i
                 break
 
-        # Don't let refinement collapse the P-wave
-        min_p_samples = 4
+        # Don't let refinement collapse the P-wave (min ~16 ms)
+        min_p_samples = max(4, int(round(0.016 * self.fs)))
         if refined_offset - refined_onset < min_p_samples:
             return p_onset_win, p_offset_win
 

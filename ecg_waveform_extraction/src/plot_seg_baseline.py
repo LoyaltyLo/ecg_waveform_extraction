@@ -32,7 +32,7 @@ from ecg_waveform_extraction.src.plot_ecg_baseline import estimate_baseline
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
 CACHE_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_limb_leads')
 OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_seg_baseline')
-MAX_SAMPLES = 4000
+MAX_SAMPLES = 16000
 
 LEAD_ORDER = ['I', 'II', 'III', 'AVR', 'AVL', 'AVF']
 C_RAW, C_BASE, C_CORR = '#9e9e9e', '#f44336', '#1565c0'

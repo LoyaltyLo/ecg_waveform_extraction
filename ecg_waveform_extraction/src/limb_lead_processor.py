@@ -10,7 +10,7 @@ Usage:
     )
     from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 
-    processor = LimbLeadProcessor(max_samples=4000)
+    processor = LimbLeadProcessor(max_samples=16000)
     aecg = parse_aecg('path/to/file.aECG')
     result = processor.process_record(aecg)
     # result.leads['I']  -> LeadResult for Lead I
@@ -29,6 +29,14 @@ from .segmentation import ECGSegmenter
 from .extraction.qrs_refiner import (
     refine_qrs_boundaries, compute_qrs_polarity_v2,
 )
+
+# Optional prominence-based P/T refinement (Emrich et al., EUSIPCO 2024).
+# Missing package -> keep raw HSMM boundaries instead of failing.
+try:
+    from .delineation.prominence_stage import refine_p_t_boundaries
+    _HAS_PROMINENCE = True
+except ImportError:
+    _HAS_PROMINENCE = False
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -135,11 +143,20 @@ class LimbLeadProcessor:
         Sampling frequency override (default 250; actual fs from aECG is used).
     max_samples : int or None
         Truncate signals to this many samples (None = full signal).
+        Default 16000 = full 10 s at 1 kHz (4000 was the 250 Hz-era value,
+        i.e. only 4 s of a 1 kHz record).
+    use_prominence_delineation : bool
+        Refine P/T beat boundaries with the prominence delineator
+        (Emrich et al., EUSIPCO 2024) after HSMM segmentation. Falls back to
+        the raw HSMM boundaries per beat where the delineator finds nothing,
+        and entirely if the package is missing.
     """
 
-    def __init__(self, fs: float = 250.0, max_samples: int = 4000):
+    def __init__(self, fs: float = 250.0, max_samples: int = 16000,
+                 use_prominence_delineation: bool = True):
         self.fs = fs
         self.max_samples = max_samples
+        self.use_prominence_delineation = use_prominence_delineation
 
     # ------------------------------------------------------------------
     # Public API
@@ -166,7 +183,9 @@ class LimbLeadProcessor:
         t0 = time.time()
 
         signals = aecg_data.get('signals', {})
-        fs_actual = aecg_data.get('fs', self.fs)
+        # `or` (not .get default) so an explicit fs=None from a partial
+        # parser result falls back too, instead of propagating None.
+        fs_actual = aecg_data.get('fs') or self.fs
         record_name = record_name or aecg_data.get('filename', 'unknown')
 
         leads: dict[str, LeadResult | None] = {}
@@ -252,6 +271,17 @@ class LimbLeadProcessor:
             'beats': seg_result.beats,  # BeatBoundary objects
         }
 
+        # ---- Step 3.5: Prominence refinement of P/T boundaries ----
+        # R-anchored physiological-window delineation (Emrich et al. 2024)
+        # overwrites BeatBoundary p_onset/p_offset/t_onset/t_offset where it
+        # finds valid waves; HSMM boundaries stay as the per-beat fallback.
+        # QRS boundaries are untouched (package R_on/R_off are exploratory).
+        prom_refined = 0
+        if self.use_prominence_delineation and _HAS_PROMINENCE and seg_result.beats:
+            prom_refined = refine_p_t_boundaries(
+                seg_result.beats, clean, fs_actual)
+        seg_data['prominence_refined_beats'] = prom_refined
+
         # ---- Steps 4 & 5: Per-beat extraction ----
         beats = []
         p_waves = []
@@ -272,7 +302,8 @@ class LimbLeadProcessor:
                 criterion_mode='c1')
 
             # QRS segment metrics
-            bl = float(np.mean(clean[max(0, q_on - 30):q_on])) if q_on >= 30 \
+            bl_win = int(0.12 * fs_actual)  # 120 ms pre-QRS baseline
+            bl = float(np.mean(clean[max(0, q_on - bl_win):q_on])) if q_on >= bl_win \
                  else float(np.median(clean[q_on:min(q_on + 10, T)]))
             r_amp = float(clean[r_pk] - bl) if 0 <= r_pk < T else 0.0
             dur_ms = (s_off - q_on) / fs_actual * 1000.0
@@ -411,6 +442,7 @@ class LimbLeadProcessor:
             'net_area': round(net_area, 4),
             'peak_amplitude': round(p_peak, 4),
             'polarity': pol,
+            'source': getattr(beat, 'p_source', 'hsmm'),
         }
 
     # ------------------------------------------------------------------
@@ -472,6 +504,7 @@ class LimbLeadProcessor:
             'net_area': round(net_area, 4),
             'peak_amplitude': round(t_peak, 4),
             'polarity': pol,
+            'source': getattr(beat, 't_source', 'hsmm'),
         }
 
 

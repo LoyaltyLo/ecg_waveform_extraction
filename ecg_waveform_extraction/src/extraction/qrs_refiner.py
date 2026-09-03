@@ -111,7 +111,8 @@ def compute_qrs_metrics(ecg_clean: np.ndarray,
     """
     T = len(ecg_clean)
     seg = ecg_clean[q_on:s_off + 1]
-    bl = float(np.mean(ecg_clean[max(0, q_on - 30):q_on])) if q_on >= 30 else float(np.median(seg[:5]))
+    bl_win = int(0.12 * fs)  # 120 ms pre-QRS baseline
+    bl = float(np.mean(ecg_clean[max(0, q_on - bl_win):q_on])) if q_on >= bl_win else float(np.median(seg[:5]))
     detrend = seg - bl
     dur = len(seg) / fs * 1000.0
     r_amp = float(ecg_clean[r_pk] - bl) if 0 <= r_pk < T else 0.0

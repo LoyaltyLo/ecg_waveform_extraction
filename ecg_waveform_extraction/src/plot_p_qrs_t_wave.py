@@ -29,7 +29,7 @@ AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
 OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_p_qrs_t_wave')
 os.makedirs(OUT_DIR, exist_ok=True)
 N_FILES = 50
-MAX_SAMPLES = 4000
+MAX_SAMPLES = 16000
 MAX_BEATS_PER_RECORD = 6
 LEADS_TO_PROCESS = ['I', 'II']
 

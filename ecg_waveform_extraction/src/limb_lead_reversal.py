@@ -25,7 +25,7 @@ Usage
     from ecg_waveform_extraction.src.utils.aecg_parser import parse_aecg
 
     # Option A: from pre-computed LimbLeadResult
-    processor = LimbLeadProcessor(max_samples=4000)
+    processor = LimbLeadProcessor(max_samples=16000)
     aecg = parse_aecg('file.aECG')
     ll_result = processor.process_record(aecg)
     detector = LimbLeadReversalDetector()
@@ -239,7 +239,7 @@ class LimbLeadReversalDetector:
         ReversalResult
         """
         from .limb_lead_processor import LimbLeadProcessor
-        processor = LimbLeadProcessor(max_samples=4000)
+        processor = LimbLeadProcessor(max_samples=16000)
         ll_result, _ = processor.process_record(aecg_data, record_name=record_name)
         return self.detect(ll_result)
 

@@ -35,7 +35,7 @@ AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
 OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_hsmm_vs_pt')
 os.makedirs(OUT_DIR, exist_ok=True)
 N_FILES = 50
-MAX_SAMPLES = 4000
+MAX_SAMPLES = 16000
 RPEAK_TOL_MS = 100  # tolerance for matching R-peaks (ms)
 
 POLARITY_COLORS = {'positive': '#4caf50', 'negative': '#f44336', 'biphasic': '#ff9800', 'uncertain': '#9e9e9e'}

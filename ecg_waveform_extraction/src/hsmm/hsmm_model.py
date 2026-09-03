@@ -41,8 +41,12 @@ PREDECESSORS = {j: [i for i, tgt in ALLOWED_TRANSITIONS if tgt == j]
 SUCCESSORS = {i: [j for src, j in ALLOWED_TRANSITIONS if src == i]
               for i in range(N_STATES)}
 
-# Global D_max cap (2 seconds worth of samples at 250 Hz)
-GLOBAL_D_MAX = 500
+# Global D_max cap in SECONDS (bounds the decoder's O(T*N*D) duration loop).
+# Converted to samples per instance from fs: 2 s at 250 Hz -> 500 samples,
+# 2 s at 1 kHz -> 2000 samples. The old hard-coded GLOBAL_D_MAX = 500 clamped
+# TP/ISO segments to 0.5 s on 1 kHz data, forcing spurious states on slow
+# rhythms.
+GLOBAL_D_MAX_SECONDS = 2.0
 
 
 class HSMMModel:
@@ -73,6 +77,9 @@ class HSMMModel:
         self.n_gmm_components = n_gmm_components
         self.fs = fs
 
+        # Global duration cap, fs-derived (see GLOBAL_D_MAX_SECONDS above)
+        self._d_max_cap = max(2, int(round(GLOBAL_D_MAX_SECONDS * self.fs)))
+
         if len(self.state_labels) != self.n_states:
             raise ValueError(
                 f"state_labels length ({len(self.state_labels)}) != n_states ({n_states})"
@@ -91,7 +98,7 @@ class HSMMModel:
             DurationDistribution() for _ in range(n_states)
         ]
 
-        self.D_max = np.full(n_states, GLOBAL_D_MAX, dtype=int)
+        self.D_max = np.full(n_states, self._d_max_cap, dtype=int)
 
         # Lazily built predecessor/successor cache (invalidated when A changes)
         self._topo_cache: tuple[dict[int, list[int]], dict[int, list[int]]] | None = None
@@ -158,11 +165,11 @@ class HSMMModel:
         self._compute_D_max()
 
     def _compute_D_max(self):
-        """Set D_max per state as mu + 4*sigma, clamped to GLOBAL_D_MAX."""
+        """Set D_max per state as mu + 4*sigma, clamped to the fs-derived cap."""
         for i in range(self.n_states):
             dd = self.dur_dists[i]
             d_max = int(np.round(dd.mu + 4.0 * dd.sigma))
-            d_max = min(d_max, GLOBAL_D_MAX)
+            d_max = min(d_max, self._d_max_cap)
             d_max = max(d_max, dd.d_min * 2)  # at least 2x d_min
             self.D_max[i] = d_max
 

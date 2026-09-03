@@ -106,7 +106,7 @@ def process_record(rec_name, model, decoder, p_extractor, analyzer):
             pass
 
         # Preprocess
-        prep = ECGPreprocessor(fs=fs)
+        prep = ECGPreprocessor(fs=fs, notch_freq=60.0)  # MIT-BIH: US mains
         clean = prep.preprocess(sig)
         np.save(os.path.join(rec_dir, "filtered_ecg.npy"), clean)
 

@@ -69,7 +69,7 @@ def gather_data(data_dir, max_sec, max_samples):
             if len(sig) > max_n:
                 sig = sig[:max_n]
 
-            prep = ECGPreprocessor(fs=fs)
+            prep = ECGPreprocessor(fs=fs, notch_freq=60.0)  # MIT-BIH: US mains
             clean = prep.preprocess(sig)
             fe = FeatureExtractor(fs=fs)
             features = fe.extract(clean)

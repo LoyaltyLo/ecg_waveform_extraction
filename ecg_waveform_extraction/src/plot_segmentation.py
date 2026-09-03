@@ -184,8 +184,12 @@ def plot_lead_overview(seg_data: dict, lead_name: str, rec_name: str,
     ax.set_xlim(t_plot[0], t_plot[-1])
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Amplitude (norm)')
+    # Provenance note: P/T beat markers may be prominence-refined on top of
+    # the HSMM states (delineation.prominence_stage).
+    n_prom = seg_data.get('prominence_refined_beats', 0)
+    prom_note = f', P/T prominence-refined: {n_prom}' if n_prom else ''
     ax.set_title(f'{rec_name} — Lead {lead_name} HSMM Segmentation '
-                 f'({len(beats)} beats)', fontsize=13, fontweight='bold')
+                 f'({len(beats)} beats{prom_note})', fontsize=13, fontweight='bold')
     ax.grid(True, alpha=0.12)
 
     fig.tight_layout()
@@ -286,8 +290,10 @@ def plot_beat_detail(seg_data: dict, beat, beat_idx: int, lead_name: str,
     ax.set_xlim(t_win[0], t_win[-1])
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Amplitude (norm)')
+    _src = getattr(beat, 'p_source', 'hsmm')
+    src_note = f' [P:{_src}]' if _src != 'hsmm' else ''
     ax.set_title(f'{rec_name} — Lead {lead_name} Beat {beat.beat_id} '
-                 f'(#{beat_idx + 1})', fontsize=12, fontweight='bold')
+                 f'(#{beat_idx + 1}){src_note}', fontsize=12, fontweight='bold')
     ax.grid(True, alpha=0.12)
 
     fig.tight_layout()

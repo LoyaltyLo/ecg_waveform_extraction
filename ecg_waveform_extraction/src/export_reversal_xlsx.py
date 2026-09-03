@@ -36,7 +36,7 @@ from openpyxl.formatting.rule import CellIsRule
 AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
 CACHE_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_limb_leads')
 OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full/_reversal')
-MAX_SAMPLES = 4000
+MAX_SAMPLES = 16000
 
 # ---------------------------------------------------------------------------
 # Style definitions

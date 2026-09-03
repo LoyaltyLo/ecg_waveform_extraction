@@ -86,7 +86,7 @@ def load_all_with_types():
             types = Counter(s for _, s in ann_beats)
             dominant = types.most_common(1)[0][0] if types else '?'
 
-            prep = ECGPreprocessor(fs=fs)
+            prep = ECGPreprocessor(fs=fs, notch_freq=60.0)  # MIT-BIH: US mains
             clean = prep.preprocess(sig)
             fe = FeatureExtractor(fs=fs)
             features = fe.extract(clean)

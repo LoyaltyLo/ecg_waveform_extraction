@@ -32,7 +32,8 @@ def smart_initialize_gmms(model: HSMMModel, features: np.ndarray):
     T = features.shape[0]
     N = model.n_states
 
-    if T < 100:
+    # ~0.4 s of signal minimum (was a flat 100 SAMPLES, i.e. 0.1 s at 1 kHz)
+    if T < int(0.4 * model.fs):
         return  # Too short
 
     amp = features[:, 0]

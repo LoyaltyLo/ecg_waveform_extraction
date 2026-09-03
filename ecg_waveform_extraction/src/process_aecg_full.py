@@ -32,7 +32,7 @@ AECG_DIR = 'C:/LoyaltyLo/datasets/RA-LA_Reversal/aECG'
 OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala_full')
 os.makedirs(OUT_DIR, exist_ok=True)
 
-MAX_SAMPLES = 4000        # 4s for speed
+MAX_SAMPLES = 16000        # full 10 s at 1 kHz (4000 was the 250 Hz-era value = 4 s)
 PLOT_PER_BEAT = True      # generate per-beat waveform + P-wave plots
 BATCH_PRINT_EVERY = 10
 

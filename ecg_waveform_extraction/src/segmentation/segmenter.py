@@ -27,6 +27,10 @@ class BeatBoundary:
     t_onset: int = -1
     t_offset: int = -1
     tp_start: int = -1
+    # Provenance of the P/T boundaries: 'hsmm' (Stage 1 states) or
+    # 'prominence' (delineation.prominence_stage refinement).
+    p_source: str = 'hsmm'
+    t_source: str = 'hsmm'
 
     # Convenience aliases
     @property

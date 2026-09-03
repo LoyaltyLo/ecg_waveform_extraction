@@ -17,8 +17,9 @@ class ECGPreprocessor:
     fs : float
         Sampling frequency in Hz. Default 250.0.
     notch_freq : float or None
-        Power-line frequency. If None, auto-detects from common values (50/60 Hz)
-        based on the closest match to typical sampling rates.
+        Power-line frequency in Hz. If None, defaults to 50.0 (CN/EU mains —
+        the aECG dataset). Mains frequency cannot be inferred from fs; pass
+        60.0 explicitly for 60 Hz recordings (e.g. MIT-BIH at 360 Hz).
     """
 
     def __init__(self, fs: float = 250.0, notch_freq: float | None = None):
@@ -28,11 +29,10 @@ class ECGPreprocessor:
         self.fs = fs
         self.nyquist = fs / 2.0
 
-        # Auto-detect power-line frequency if not specified
-        if notch_freq is None:
-            self.notch_freq = 50.0 if abs(fs - 250.0) < abs(fs - 360.0) else 60.0
-        else:
-            self.notch_freq = notch_freq
+        # Mains frequency is a property of the recording site, not of fs —
+        # the old |fs-250| vs |fs-360| heuristic silently picked 60 Hz for
+        # the 1 kHz aECG data and left 50 Hz line noise un-notched.
+        self.notch_freq = notch_freq if notch_freq is not None else 50.0
 
         self._bandpass_coeffs = None
         self._notch_coeffs = None

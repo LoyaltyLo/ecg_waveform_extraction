@@ -40,7 +40,7 @@ OUT_DIR = str(Path(__file__).resolve().parent.parent / 'output/rala')
 os.makedirs(OUT_DIR, exist_ok=True)
 
 SKIP_PLOTS = True  # Skip per-file plots for speed in batch mode
-MAX_SAMPLES = 4000  # Process first 4s for faster processing
+MAX_SAMPLES = 16000  # full 10 s at 1 kHz (4000 was the 250 Hz-era value = 4 s)
 
 
 # =====================================================================
@@ -182,7 +182,7 @@ def process_file(filepath):
     if lead_ii is None:
         return {'filename': rec_name, 'error': 'No lead II signal'}
 
-    # Truncate to MAX_SAMPLES (first 8s)
+    # Truncate to MAX_SAMPLES (no-op for full 10 s @1 kHz records)
     n = min(len(lead_ii), MAX_SAMPLES)
     signal = lead_ii[:n].astype(np.float64)
 

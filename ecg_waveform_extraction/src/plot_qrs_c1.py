@@ -89,9 +89,14 @@ def plot_qrs_c1_beat(ecg_clean, q_on, r_pk, s_off, fs, lead_name,
     qrs_e = s_off - ws
     detrend_qrs = ecg_clean[q_on:s_off + 1]
 
-    # Baseline from pre-QRS
-    bl = float(np.median(ecg_clean[max(0, q_on - 30):q_on])) if q_on >= 30 \
-         else float(np.median(detrend_qrs[:5]))
+    # Baseline from pre-QRS — MUST match compute_qrs_polarity_v2's 50 ms
+    # median baseline (extraction/qrs_refiner.py) so the PNG's C1 label
+    # agrees with the polarity counted into qrs_c1_summary.xlsx. (The old
+    # fixed 30-sample window was 30 ms at 1 kHz and caused 23/878 flips.)
+    bl_win = int(0.05 * fs)
+    bl = float(np.median(ecg_clean[max(0, q_on - bl_win):q_on])) \
+         if q_on - max(0, q_on - bl_win) >= 5 \
+         else float(np.median(detrend_qrs[:min(5, len(detrend_qrs))]))
     detrend = detrend_qrs - bl
 
     c1 = compute_c1(detrend)
