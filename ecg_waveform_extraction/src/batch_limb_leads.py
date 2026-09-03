@@ -49,7 +49,8 @@ LEAD_COLORS = {
 # ---------------------------------------------------------------------------
 # Per-record processing
 # ---------------------------------------------------------------------------
-def process_record(fpath: str, processor: LimbLeadProcessor) -> dict | None:
+def process_record(fpath: str, processor: LimbLeadProcessor,
+                   save_plots: bool = True) -> dict | None:
     """Process one aECG file: parse → HSMM 6-lead → save → return summary."""
     fname = os.path.basename(fpath)
     rec_name = fname.replace('.aECG', '')
@@ -65,10 +66,8 @@ def process_record(fpath: str, processor: LimbLeadProcessor) -> dict | None:
     # Process all 6 leads
     result, seg_data = processor.process_record(aecg, record_name=rec_name)
 
-    # ---- Save segment data (.npy) + generate segmentation plots ----
-    _save_segmentation_data(seg_data, rec_dir, rec_name)
-
-    # ---- Save per-lead details ----
+    # ---- Save segment data (.npy) + segmentation plots ----
+    _save_segmentation_data(seg_data, rec_dir, rec_name, save_plots=save_plots)
     for lead_name in LIMB_LEADS:
         lr = result.leads.get(lead_name)
         if lr is None:
@@ -84,13 +83,26 @@ def process_record(fpath: str, processor: LimbLeadProcessor) -> dict | None:
         with open(os.path.join(lead_dir, 'p_waves.json'), 'w', encoding='utf-8') as f:
             json.dump(lr.p_waves, f, indent=2)
 
+        # T-wave JSON
+        with open(os.path.join(lead_dir, 't_waves.json'), 'w', encoding='utf-8') as f:
+            json.dump(lr.t_waves, f, indent=2)
+
+        # Full BeatBoundary set: every boundary field incl. ISO/PR/ST/TP
+        # segment starts and P/T provenance (hsmm vs prominence).
+        sd = seg_data.get(lead_name)
+        if sd is not None and sd.get('beats'):
+            from dataclasses import asdict
+            with open(os.path.join(lead_dir, 'beats.json'), 'w', encoding='utf-8') as f:
+                json.dump([asdict(b) for b in sd['beats']], f, indent=2)
+
     # ---- Save record summary ----
     summary = result_to_dict(result)
     with open(os.path.join(rec_dir, 'summary.json'), 'w', encoding='utf-8') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
     # ---- Overview plot ----
-    _save_record_plot(result, rec_dir)
+    if save_plots:
+        _save_record_plot(result, rec_dir)
 
     # ---- Cross-lead polarity comparison ----
     xlead = compare_polarity_across_leads(result)
@@ -103,7 +115,8 @@ def process_record(fpath: str, processor: LimbLeadProcessor) -> dict | None:
 # ---------------------------------------------------------------------------
 # Segment data saving + plotting
 # ---------------------------------------------------------------------------
-def _save_segmentation_data(seg_data: dict, rec_dir: str, rec_name: str):
+def _save_segmentation_data(seg_data: dict, rec_dir: str, rec_name: str,
+                            save_plots: bool = True):
     """Save HSMM state labels and generate waveform segmentation plots.
 
     Parameters
@@ -112,9 +125,10 @@ def _save_segmentation_data(seg_data: dict, rec_dir: str, rec_name: str):
         lead_name -> dict with filtered_ecg, state_labels, state_names, fs, beats.
     rec_dir : str
     rec_name : str
+    save_plots : bool
+        When False, only the .npy caches are written (per-beat PNGs can be
+        regenerated later from the cache via plot_segmentation).
     """
-    from ecg_waveform_extraction.src.plot_segmentation import save_all_segmentation_plots
-
     # Save numpy arrays per lead
     for lead_name, sd in seg_data.items():
         if sd is None or sd.get('filtered_ecg') is None:
@@ -126,6 +140,10 @@ def _save_segmentation_data(seg_data: dict, rec_dir: str, rec_name: str):
         np.save(os.path.join(lead_dir, 'filtered_ecg.npy'), sd['filtered_ecg'])
         np.save(os.path.join(lead_dir, 'state_labels.npy'), sd['state_labels'])
 
+    if not save_plots:
+        return
+
+    from ecg_waveform_extraction.src.plot_segmentation import save_all_segmentation_plots
     # Generate all segmentation plots
     try:
         save_all_segmentation_plots(seg_data, rec_name, rec_dir,
@@ -339,6 +357,9 @@ def main():
                         help='Start index (for resuming)')
     parser.add_argument('--out', type=str, default=None,
                         help='Output directory override')
+    parser.add_argument('--no-plots', action='store_true',
+                        help='Skip per-beat PNG generation (data caches '
+                             'still written; plots regenerable from cache)')
     args = parser.parse_args()
 
     # Output dir
@@ -390,7 +411,7 @@ def main():
         t0 = time.time()
 
         try:
-            summary = process_record(fpath, processor)
+            summary = process_record(fpath, processor, save_plots=not args.no_plots)
         except Exception as e:
             print(f"ERROR: {e}")
             gc.collect()
