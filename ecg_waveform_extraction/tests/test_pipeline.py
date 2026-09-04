@@ -7,6 +7,8 @@ Covers:
 - R-peak localization against ground truth
 - fs threading: D_max cap, full 1 kHz pipeline, prominence P/T refinement
 """
+import copy
+
 import numpy as np
 import pytest
 
@@ -19,6 +21,9 @@ from ecg_waveform_extraction.src.segmentation import ECGSegmenter
 from ecg_waveform_extraction.src.utils.data_loader import generate_synthetic_ecg
 from ecg_waveform_extraction.src.delineation.prominence_stage import (
     ProminenceStage, refine_p_t_boundaries,
+)
+from ecg_waveform_extraction.src.delineation.wavelet_stage import (
+    WaveletStage, crosscheck_qrs_boundaries,
 )
 
 FS = 250.0
@@ -209,7 +214,6 @@ def test_prominence_refines_p_boundaries_1khz(synthetic_result_1khz):
                 f"T window [{pb.t_onset},{pb.t_offset}] not after R={pb.r_peak}")
 
     # ---- In-place write-back: assert on the MUTATED beats, not the wrapper ----
-    import copy
     beats = copy.deepcopy(result.beats)
 
     def _truth_errors(bs):
@@ -277,10 +281,35 @@ def test_prominence_stage_guards():
     assert refine_p_t_boundaries([], ecg, FS_HR) == 0
 
 
+def test_wavelet_crosscheck_1khz(synthetic_result_1khz):
+    """Martinez-wavelet second opinion runs, matches beats by R peak, and
+    never modifies the production boundaries."""
+    result, _ = synthetic_result_1khz
+    beats = copy.deepcopy(result.beats)
+    pre = [(b.q_onset, b.s_offset) for b in beats]
+
+    stats = crosscheck_qrs_boundaries(beats, result.filtered_ecg, FS_HR)
+    assert stats['n_production'] == len(
+        [b for b in beats if b.q_onset > 0 and b.s_offset > 0])
+    # wavedet should find beats on the clean synthetic signal
+    assert stats['n_matched'] >= 1, "wavelet cross-check matched nothing"
+    for m in stats['matches']:
+        assert m['wd_qrs_onset'] < m['wd_qrs_offset']
+    # read-only guarantee
+    assert pre == [(b.q_onset, b.s_offset) for b in beats]
+
+
+def test_wavelet_stage_guards():
+    """Degenerate signals must not crash the wavedet wrapper."""
+    stage = WaveletStage(FS_HR)
+    assert stage.delineate(np.zeros(2000)) == []
+    stats = crosscheck_qrs_boundaries([], np.zeros(2000), FS_HR)
+    assert stats['n_matched'] == 0
+
+
 def test_prominence_inverted_p_and_monotonicity(synthetic_result_1khz):
     """Negated signal: inverted P found via the mirror pass; T never runs
     into the next beat's P (Tier-0 gates)."""
-    import copy
     result, data = synthetic_result_1khz
 
     # Inverted record: mirror the signal; boundaries must still be refined

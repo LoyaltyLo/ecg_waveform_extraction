@@ -38,6 +38,14 @@ try:
 except ImportError:
     _HAS_PROMINENCE = False
 
+# Optional Martinez-wavelet QRS cross-check (wavedet, ecg-kit lineage).
+# Second opinion only — never modifies production boundaries.
+try:
+    from .delineation.wavelet_stage import crosscheck_qrs_boundaries
+    _HAS_WAVELET = True
+except ImportError:
+    _HAS_WAVELET = False
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -150,13 +158,20 @@ class LimbLeadProcessor:
         (Emrich et al., EUSIPCO 2024) after HSMM segmentation. Falls back to
         the raw HSMM boundaries per beat where the delineator finds nothing,
         and entirely if the package is missing.
+    use_wavelet_crosscheck : bool
+        Run the Martinez-wavelet second opinion (wavedet / ecg-kit lineage)
+        on QRS boundaries and annotate each beat dict with ``qrs_on_wd`` /
+        ``qrs_off_wd`` plus a per-lead agreement summary in seg_data.
+        Read-only: production QRS boundaries are never modified.
     """
 
     def __init__(self, fs: float = 250.0, max_samples: int = 16000,
-                 use_prominence_delineation: bool = True):
+                 use_prominence_delineation: bool = True,
+                 use_wavelet_crosscheck: bool = True):
         self.fs = fs
         self.max_samples = max_samples
         self.use_prominence_delineation = use_prominence_delineation
+        self.use_wavelet_crosscheck = use_wavelet_crosscheck
 
     # ------------------------------------------------------------------
     # Public API
@@ -282,6 +297,21 @@ class LimbLeadProcessor:
                 seg_result.beats, clean, fs_actual)
         seg_data['prominence_refined_beats'] = prom_refined
 
+        # ---- Step 3.6: Martinez-wavelet QRS second opinion ----
+        # Read-only cross-check: per-beat wavedet QRS marks land in the beat
+        # dicts (qrs_on_wd / qrs_off_wd); summary in seg_data. Never modifies
+        # production boundaries.
+        wd_map = {}
+        if self.use_wavelet_crosscheck and _HAS_WAVELET and seg_result.beats:
+            cc = crosscheck_qrs_boundaries(seg_result.beats, clean, fs_actual)
+            seg_data['wavelet_crosscheck'] = {
+                k: cc[k] for k in ('n_production', 'n_wavelet', 'n_matched',
+                                   'n_disagree', 'median_on_shift_ms',
+                                   'median_off_shift_ms')}
+            for m in cc.get('matches', []):
+                wd_map[m['r_peak']] = (m['wd_qrs_onset'], m['wd_qrs_offset'])
+        seg_data['wavelet_crosschecked'] = bool(wd_map)
+
         # ---- Steps 4 & 5: Per-beat extraction ----
         beats = []
         p_waves = []
@@ -320,6 +350,9 @@ class LimbLeadProcessor:
                 'qrs_net_area': pol['qrs_net_area'],
                 'duration_ms': round(dur_ms, 2),
                 'r_amplitude': round(r_amp, 4),
+                # Martinez-wavelet second opinion (read-only reference)
+                'qrs_on_wd': wd_map.get(r_pk, (-1, -1))[0],
+                'qrs_off_wd': wd_map.get(r_pk, (-1, -1))[1],
             })
 
             # P-wave from HSMM P-state boundaries
