@@ -28,6 +28,9 @@ Known limitations (see output/traditional_delineation_recommendations):
 - Monotonicity: a post-pass clamps every T offset below the next beat's
   earliest anchor (p_onset / q_onset / r_peak); degenerate windows are
   dropped (set to -1), so T windows never run into the next beat's P.
+- T coverage note: window/segment-edge rejection moves edge-pinned T waves
+  (~1/3 of beats on the real cache) to the HSMM fallback, whose T windows
+  are healthy since the d_min fix (median 120 ms, <1% non-physiological).
 - Requires at least 2 R-peaks: the package indexes ``rr[0]``/``rr[-1]`` and
   crashes on fewer, so the wrapper returns an empty result instead.
 """
@@ -108,6 +111,17 @@ class ProminenceStage:
                 "(pip install prominence-delineator)") from exc
         self._delineator = ProminenceDelineator(sampling_frequency=self.fs)
 
+        # The package hard-codes the basepoint windows in __init__ as the
+        # peak-prominence wlen: P +-0.1 s (=100 ms max P duration, seen as the
+        # 99-101 ms histogram spike) and T +-0.2 s. Widen the P window so a
+        # genuine P onset/offset can fall outside the pinned 100 ms; leave T
+        # at its package default (QT bias is measured +, widening T would
+        # overshoot the offset further). Edge-pinned solutions are rejected
+        # in refine_p_t_boundaries anyway (_at_edge + HSMM fallback).
+        self._p_wlen = int(round(0.16 * self.fs))
+        self._t_wlen = int(round(0.2 * self.fs))
+        self._delineator.max_p_basepoint_interval = self._p_wlen
+
     def delineate(self, ecg_clean: np.ndarray,
                   r_peaks) -> list[ProminenceBeat]:
         """Delineate P/QRS/T waves for one lead.
@@ -182,6 +196,43 @@ def _valid_p(p_on: int, p_off: int, r_peak: int, q_onset: int = -1) -> bool:
     return True
 
 
+def _windows_overlap(a_on: int, a_off: int, b_on: int, b_off: int,
+                     frac: float = 0.5) -> bool:
+    """True if two windows cover the same physical wave (>= frac of the
+    shorter window overlaps). Used to decide whether the upright and
+    negated-signal passes converged on the same P — a noise bump on the TP
+    segment does not overlap the true P window."""
+    ov = min(a_off, b_off) - max(a_on, b_on)
+    if ov <= 0:
+        return False
+    shorter = min(a_off - a_on, b_off - b_on)
+    return ov >= frac * max(shorter, 1)
+
+
+def _at_edge(on: int, off: int, peak: int, wlen: int,
+             seg_l: int = -1, seg_r: int = -1) -> bool:
+    """True if a basepoint sits at a window or segment boundary.
+
+    Two pinning mechanisms make a basepoint report the window, not the wave:
+    (1) scipy peak-prominences ``wlen`` is centered on the peak, so
+    basepoints cap at peak +- wlen/2 (the classic 99-101 ms P / ~201 ms T
+    duration spikes); (2) the package computes basepoints on the per-beat
+    segment ``sig[l:r]`` (l/r = midpoint to the previous/next R), and scipy
+    clips the wlen window to the array bounds, so onsets can pin at the
+    segment start (tachycardic P) and offsets at the segment end
+    R + rr_next/2 (long-QT T). Both cases fall back to the HSMM boundary.
+    """
+    if peak >= 0 and wlen > 0:
+        half = wlen / 2.0
+        if abs(on - (peak - half)) <= 2 or abs(off - (peak + half)) <= 2:
+            return True
+    if seg_l >= 0 and on <= seg_l + 2:
+        return True
+    if seg_r >= 0 and off >= seg_r - 3:
+        return True
+    return False
+
+
 def _valid_t(pb: ProminenceBeat, r_peak: int, n_samples: int,
              next_anchor: int = -1) -> bool:
     """T boundaries must lie after the R peak and before the next beat.
@@ -217,17 +268,20 @@ def _next_anchor(beats, i: int, r_peak: int) -> int:
 P_SNR_FACTOR = 2.5
 
 
-def _p_passes_snr(ecg: np.ndarray, p_on: int, p_off: int, fs: float) -> bool:
+def _p_passes_snr(ecg: np.ndarray, p_on: int, p_off: int, fs: float,
+                  ref_floor: int = 0) -> bool:
     """Detrended P amplitude must exceed the local TP-segment noise.
 
     The noise reference is the 40-160 ms window ending 20 ms before the P
-    onset (20 ms guard so the P upstroke itself is excluded). If the
-    reference window is unavailable (signal start) the gate passes — the
-    geometry guards still apply.
+    onset (20 ms guard so the P upstroke itself is excluded). ``ref_floor``
+    clamps the reference start below the previous beat's T offset — without
+    it, earlier P onsets drift the reference onto the previous T tail and
+    the gate selectively rejects short-RR beats. If the reference window is
+    unavailable (signal start) the gate passes — the geometry guards still
+    apply.
     """
-    n = len(ecg)
     ref_end = p_on - int(round(0.02 * fs))
-    ref_start = max(0, p_on - int(round(0.16 * fs)))
+    ref_start = max(0, p_on - int(round(0.16 * fs)), ref_floor)
     seg = ecg[p_on:p_off + 1]
     if len(seg) == 0:
         return False
@@ -283,27 +337,58 @@ def refine_p_t_boundaries(beats, ecg_clean: np.ndarray, fs: float) -> int:
         pb = by_rpeak.get(b.r_peak)
         if pb is None:
             continue
-        # P: upright candidate first, then the inverted-P candidate from the
-        # negated-signal pass. Both must pass geometry AND the local SNR
-        # gate (fabricated P on flat TP segments fails the amplitude check).
+        # Segment bounds mirror the package's per-beat split
+        # (l = R - rr_prev/2, r = R + rr_next/2): basepoints pinned there are
+        # scipy window clipping, not wave boundaries.
+        seg_l = seg_r = -1
+        if i > 0:
+            seg_l = b.r_peak - (b.r_peak - beats[i - 1].r_peak) // 2
+        if i + 1 < len(beats):
+            seg_r = b.r_peak + (beats[i + 1].r_peak - b.r_peak) // 2
+        # SNR reference floor: never read the previous beat's T tail
+        prev_t_off = beats[i - 1].t_offset if i > 0 else -1
+        ref_floor = prev_t_off + 1 if prev_t_off > 0 else 0
+
+        # P: upright candidate first; the inverted-P candidate (negated
+        # pass) is tried when the upright one is ABSENT, or when both passes
+        # agree on the peak position (same physical wave seen at both
+        # polarities — strong evidence of a real P; take the pass whose
+        # geometry is valid). When the upright candidate exists but failed
+        # and the passes disagree, the negated candidate is a TP noise bump
+        # (reproduced on synthetic beats) — fall back to HSMM. All
+        # candidates must pass geometry, local SNR, and window/segment edge
+        # rejection (a basepoint pinned at an edge is the window, not the
+        # wave).
+        upright_present = pb.p_peak >= 0 and pb.p_onset >= 0
+        same_wave = (upright_present and pb.p_inv_onset >= 0
+                     and _windows_overlap(pb.p_onset, pb.p_offset,
+                                          pb.p_inv_onset, pb.p_inv_offset))
         if (_valid_p(pb.p_onset, pb.p_offset, b.r_peak, q_onset=b.q_onset)
-                and _p_passes_snr(ecg_clean, pb.p_onset, pb.p_offset, fs)):
+                and _p_passes_snr(ecg_clean, pb.p_onset, pb.p_offset, fs,
+                                  ref_floor=ref_floor)
+                and not _at_edge(pb.p_onset, pb.p_offset, pb.p_peak,
+                                 stage._p_wlen, seg_l, seg_r)):
             b.p_onset = pb.p_onset
             b.p_offset = pb.p_offset
             if hasattr(b, 'p_source'):
                 b.p_source = 'prominence'
             n_refined += 1
-        elif (pb.p_inv_onset >= 0
+        elif ((not upright_present or same_wave) and pb.p_inv_onset >= 0
               and _valid_p(pb.p_inv_onset, pb.p_inv_offset, b.r_peak,
                            q_onset=b.q_onset)
-              and _p_passes_snr(ecg_clean, pb.p_inv_onset, pb.p_inv_offset, fs)):
+              and _p_passes_snr(ecg_clean, pb.p_inv_onset, pb.p_inv_offset,
+                                fs, ref_floor=ref_floor)
+              and not _at_edge(pb.p_inv_onset, pb.p_inv_offset, pb.p_inv_peak,
+                               stage._p_wlen, seg_l, seg_r)):
             b.p_onset = pb.p_inv_onset
             b.p_offset = pb.p_inv_offset
             if hasattr(b, 'p_source'):
                 b.p_source = 'prominence'
             n_refined += 1
-        if _valid_t(pb, b.r_peak, n_samples,
-                    next_anchor=_next_anchor(beats, i, b.r_peak)):
+        if (_valid_t(pb, b.r_peak, n_samples,
+                     next_anchor=_next_anchor(beats, i, b.r_peak))
+                and not _at_edge(pb.t_onset, pb.t_offset, pb.t_peak,
+                                 stage._t_wlen, seg_l, seg_r)):
             b.t_onset = pb.t_onset
             b.t_offset = pb.t_offset
             if hasattr(b, 't_source'):
