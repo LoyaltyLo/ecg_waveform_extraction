@@ -275,3 +275,32 @@ def test_prominence_stage_guards():
     assert stage.delineate(ecg, []) == []
     assert stage.delineate(ecg, [500]) == []
     assert refine_p_t_boundaries([], ecg, FS_HR) == 0
+
+
+def test_prominence_inverted_p_and_monotonicity(synthetic_result_1khz):
+    """Negated signal: inverted P found via the mirror pass; T never runs
+    into the next beat's P (Tier-0 gates)."""
+    import copy
+    result, data = synthetic_result_1khz
+
+    # Inverted record: mirror the signal; boundaries must still be refined
+    beats = copy.deepcopy(result.beats)
+    inv_ecg = -result.filtered_ecg
+    n = refine_p_t_boundaries(beats, inv_ecg, FS_HR)
+    assert n >= len(beats) * 0.5, (
+        f"inverted-P pass refined only {n}/{len(beats)} beats")
+    for b in beats:
+        if b.p_source == 'prominence':
+            assert b.p_onset < b.p_offset < b.r_peak
+
+    # Monotonicity: on the upright record, no T window may reach the next
+    # beat's earliest anchor
+    beats = copy.deepcopy(result.beats)
+    refine_p_t_boundaries(beats, result.filtered_ecg, FS_HR)
+    for i in range(len(beats) - 1):
+        nb = beats[i + 1]
+        anchor = next((v for v in (nb.p_onset, nb.q_onset, nb.r_peak)
+                       if v > beats[i].r_peak), -1)
+        if anchor > 0 and beats[i].t_offset > 0:
+            assert beats[i].t_offset < anchor, (
+                f"beat {i} T offset {beats[i].t_offset} >= next anchor {anchor}")

@@ -14,15 +14,20 @@ exploratory and may not bracket the full QRS complex, so QRS boundaries
 remain the job of ``extraction.qrs_refiner.refine_qrs_boundaries``.
 
 Known limitations (see output/traditional_delineation_recommendations):
-- P peaks are searched among local maxima only: inverted / biphasic P waves
-  (e.g. aVR, ectopic atrial rhythm) are not detected and the HSMM boundary
-  is kept for those beats.
-- No amplitude or confidence gate: when no P exists in the search window
-  (e.g. atrial fibrillation) the most prominent extremum is returned as a
-  false P. NOTE: ``audit_spectral_consistency`` audits the HSMM state
-  sequence only and cannot see these refined windows, so consumers of the
-  P/T outputs must treat possible AF false-Ps as unfiltered (a window-level
+- The package searches P among local maxima of the signal. This wrapper
+  therefore runs a second pass on the negated signal and accepts an
+  inverted-P candidate when the upright one is missing, so retrograde /
+  aVR-negative P waves are covered.
+- False-P control: every P candidate (upright or inverted) must pass a
+  local amplitude gate — detrended P amplitude >= 2.5x the MAD-based noise
+  sigma of the quiet TP segment just before the P window. A fabricated P on
+  a flat TP segment (ectopic beat, AF) fails this gate and the HSMM
+  boundary is kept. NOTE: ``audit_spectral_consistency`` audits the HSMM
+  state sequence only and cannot see these refined windows (window-level
   audit is future work).
+- Monotonicity: a post-pass clamps every T offset below the next beat's
+  earliest anchor (p_onset / q_onset / r_peak); degenerate windows are
+  dropped (set to -1), so T windows never run into the next beat's P.
 - Requires at least 2 R-peaks: the package indexes ``rr[0]``/``rr[-1]`` and
   crashes on fewer, so the wrapper returns an empty result instead.
 """
@@ -62,6 +67,10 @@ class ProminenceBeat:
     t_offset: int = -1
     r_onset: int = -1
     r_offset: int = -1
+    # Inverted-P candidates from the negated-signal pass (upright P missing)
+    p_inv_peak: int = -1
+    p_inv_onset: int = -1
+    p_inv_offset: int = -1
 
 
 def _idx(value) -> int:
@@ -123,10 +132,14 @@ class ProminenceStage:
         if len(r_peaks) < 2:
             return []
 
+        sig = np.asarray(ecg_clean, dtype=np.float64)
         waves = self._delineator.find_waves(
-            np.asarray(ecg_clean, dtype=np.float64), r_peaks,
-            include_nodetections=True,
-        )
+            sig, r_peaks, include_nodetections=True)
+        # Second pass on the negated signal: the package's P search scans
+        # local maxima only, so inverted P waves are only visible after
+        # mirroring. Only the P fields of this pass are meaningful.
+        inv_waves = self._delineator.find_waves(
+            -sig, r_peaks, include_nodetections=True)
 
         beats = []
         for i, r in enumerate(r_peaks):
@@ -143,6 +156,9 @@ class ProminenceStage:
                 t_offset=_idx(waves['T_off'][i]),
                 r_onset=_idx(waves['R_on'][i]),
                 r_offset=_idx(waves['R_off'][i]),
+                p_inv_peak=_idx(inv_waves['P'][i]),
+                p_inv_onset=_idx(inv_waves['P_on'][i]),
+                p_inv_offset=_idx(inv_waves['P_off'][i]),
             ))
         return beats
 
@@ -152,16 +168,16 @@ def delineate_beats(ecg_clean: np.ndarray, r_peaks, fs: float) -> list[Prominenc
     return ProminenceStage(fs).delineate(ecg_clean, r_peaks)
 
 
-def _valid_p(pb: ProminenceBeat, r_peak: int, q_onset: int = -1) -> bool:
+def _valid_p(p_on: int, p_off: int, r_peak: int, q_onset: int = -1) -> bool:
     """P boundaries must lie strictly before the QRS onset.
 
     The package's P_off is the right prominence base of the P peak, which can
     land at/after the QRS onset when the P wave sits close to the Q (observed
     on real data). Falls back to the R peak when q_onset is unknown.
     """
-    if not (0 <= pb.p_onset < pb.p_offset < r_peak):
+    if not (0 <= p_on < p_off < r_peak):
         return False
-    if q_onset > 0 and pb.p_offset > q_onset:
+    if q_onset > 0 and p_off > q_onset:
         return False
     return True
 
@@ -192,6 +208,37 @@ def _next_anchor(beats, i: int, r_peak: int) -> int:
         if v > r_peak:
             return v
     return -1
+
+
+# Local-noise amplitude gate for P candidates. 2.5x the MAD-based sigma of
+# the quiet TP segment just before the P window; deliberately permissive
+# (an absolute 3-5x full-signal RMS gate was measured to discard 50-77% of
+# true P waves).
+P_SNR_FACTOR = 2.5
+
+
+def _p_passes_snr(ecg: np.ndarray, p_on: int, p_off: int, fs: float) -> bool:
+    """Detrended P amplitude must exceed the local TP-segment noise.
+
+    The noise reference is the 40-160 ms window ending 20 ms before the P
+    onset (20 ms guard so the P upstroke itself is excluded). If the
+    reference window is unavailable (signal start) the gate passes — the
+    geometry guards still apply.
+    """
+    n = len(ecg)
+    ref_end = p_on - int(round(0.02 * fs))
+    ref_start = max(0, p_on - int(round(0.16 * fs)))
+    seg = ecg[p_on:p_off + 1]
+    if len(seg) == 0:
+        return False
+    amp = float(np.max(np.abs(seg - np.median(seg))))
+    if ref_end - ref_start >= int(round(0.03 * fs)):
+        ref = ecg[ref_start:ref_end]
+        med = np.median(ref)
+        sigma = 1.4826 * float(np.median(np.abs(ref - med)))
+        if sigma > 1e-12 and amp < P_SNR_FACTOR * sigma:
+            return False
+    return True
 
 
 def refine_p_t_boundaries(beats, ecg_clean: np.ndarray, fs: float) -> int:
@@ -236,10 +283,22 @@ def refine_p_t_boundaries(beats, ecg_clean: np.ndarray, fs: float) -> int:
         pb = by_rpeak.get(b.r_peak)
         if pb is None:
             continue
-        if _valid_p(pb, b.r_peak, q_onset=b.q_onset):
+        # P: upright candidate first, then the inverted-P candidate from the
+        # negated-signal pass. Both must pass geometry AND the local SNR
+        # gate (fabricated P on flat TP segments fails the amplitude check).
+        if (_valid_p(pb.p_onset, pb.p_offset, b.r_peak, q_onset=b.q_onset)
+                and _p_passes_snr(ecg_clean, pb.p_onset, pb.p_offset, fs)):
             b.p_onset = pb.p_onset
             b.p_offset = pb.p_offset
-            # provenance tag (BeatBoundary.p_source/t_source, default 'hsmm')
+            if hasattr(b, 'p_source'):
+                b.p_source = 'prominence'
+            n_refined += 1
+        elif (pb.p_inv_onset >= 0
+              and _valid_p(pb.p_inv_onset, pb.p_inv_offset, b.r_peak,
+                           q_onset=b.q_onset)
+              and _p_passes_snr(ecg_clean, pb.p_inv_onset, pb.p_inv_offset, fs)):
+            b.p_onset = pb.p_inv_onset
+            b.p_offset = pb.p_inv_offset
             if hasattr(b, 'p_source'):
                 b.p_source = 'prominence'
             n_refined += 1
@@ -249,4 +308,18 @@ def refine_p_t_boundaries(beats, ecg_clean: np.ndarray, fs: float) -> int:
             b.t_offset = pb.t_offset
             if hasattr(b, 't_source'):
                 b.t_source = 'prominence'
+
+    # Monotonicity post-pass: the next beat's P may have been refined to an
+    # earlier onset after this beat's T was written, so re-clamp every T
+    # below the (possibly new) next anchor; drop degenerate windows.
+    min_t_samples = int(round(0.08 * fs))
+    for i in range(len(beats) - 1):
+        anchor = _next_anchor(beats, i, beats[i].r_peak)
+        if anchor > 0 and beats[i].t_offset >= anchor:
+            new_off = anchor - 1
+            if new_off - beats[i].t_onset >= min_t_samples:
+                beats[i].t_offset = new_off
+            else:
+                beats[i].t_onset = -1
+                beats[i].t_offset = -1
     return n_refined

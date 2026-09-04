@@ -89,11 +89,15 @@ def process_record(fpath: str, processor: LimbLeadProcessor,
 
         # Full BeatBoundary set: every boundary field incl. ISO/PR/ST/TP
         # segment starts and P/T provenance (hsmm vs prominence).
+        # Structurally incomplete beats (missing R or S — truncated last
+        # beat) are dropped: their -1 sentinels poison duration statistics.
         sd = seg_data.get(lead_name)
         if sd is not None and sd.get('beats'):
             from dataclasses import asdict
+            complete = [b for b in sd['beats']
+                        if b.r_peak > 0 and b.s_offset > 0]
             with open(os.path.join(lead_dir, 'beats.json'), 'w', encoding='utf-8') as f:
-                json.dump([asdict(b) for b in sd['beats']], f, indent=2)
+                json.dump([asdict(b) for b in complete], f, indent=2)
 
     # ---- Save record summary ----
     summary = result_to_dict(result)

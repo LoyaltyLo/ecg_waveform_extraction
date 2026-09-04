@@ -22,6 +22,9 @@ import numpy as np
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 BASE = os.path.join("output", "rala_full", "_limb_leads")
+# Optional cache override: audit_pt_delineation.py <cache_dir>
+if len(sys.argv) > 1:
+    BASE = sys.argv[1]
 LEADS = ["I", "II", "III", "AVR", "AVL", "AVF"]
 FS = 1000.0
 N_T_SAMPLE = 20

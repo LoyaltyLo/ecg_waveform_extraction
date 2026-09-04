@@ -335,13 +335,13 @@ class DurationDistribution:
             "R":    (60,   15),
             "S":    (30,   10),
             "ST":   (120,  60),
-            "T":    (200,  40),
+            "T":    (200,  60),
             "TP":   (200,  200),
         }
 
         d_min_ms = {
             "ISO":  1,  "P": 30,  "PR": 20, "Q": 8,
-            "R":   12, "S": 8,   "ST": 20,  "T": 60, "TP": 20,
+            "R":   12, "S": 8,   "ST": 20,  "T": 120, "TP": 20,
         }
 
         mu_ms, sigma_ms = phys_durations_ms.get(state_name, (100, 50))
