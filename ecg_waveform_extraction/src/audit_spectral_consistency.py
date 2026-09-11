@@ -294,18 +294,26 @@ def main():
                         help='audit first N cached records')
     parser.add_argument('--top', type=int, default=20,
                         help='print/save top-N suspicious (record, lead)')
+    parser.add_argument('--base', type=str, default=CACHE_DIR,
+                        help='cache dir to audit (default: the HSMM cache)')
+    parser.add_argument('--out', type=str, default=None,
+                        help='output dir override (default: the shared '
+                             '_spectral_audit dir; use a separate dir when '
+                             'auditing an alternate cache)')
     args = parser.parse_args()
+    cache_dir = args.base
+    out_dir = args.out or OUT_DIR
 
-    recs = sorted(d for d in os.listdir(CACHE_DIR)
-                  if os.path.isfile(os.path.join(CACHE_DIR, d, 'summary.json')))
+    recs = sorted(d for d in os.listdir(cache_dir)
+                  if os.path.isfile(os.path.join(cache_dir, d, 'summary.json')))
     if args.n:
         recs = recs[:args.n]
-    os.makedirs(OUT_DIR, exist_ok=True)
+    os.makedirs(out_dir, exist_ok=True)
 
     results, all_runs_flat, ranked = {}, [], []
-    print(f'Spectral audit: {len(recs)} records')
+    print(f'Spectral audit: {len(recs)} records  (cache: {cache_dir})')
     for idx, rec in enumerate(recs):
-        rec_dir = os.path.join(CACHE_DIR, rec)
+        rec_dir = os.path.join(cache_dir, rec)
         try:
             with open(os.path.join(rec_dir, 'summary.json'),
                       encoding='utf-8') as f:
@@ -350,7 +358,7 @@ def main():
     print('\n'.join(table))
 
     # save full results + summary report
-    with open(os.path.join(OUT_DIR, 'audit_results.json'), 'w',
+    with open(os.path.join(out_dir, "audit_results.json"), 'w',
               encoding='utf-8') as f:
         json.dump({'thresholds': THRESH, 'bands': BANDS,
                    'ranked': ranked, 'results': results}, f,
@@ -359,7 +367,7 @@ def main():
     n_any = sum(1 for x in ranked if x['flag_rate'] and x['flag_rate'] > 0)
     n_half = sum(1 for x in ranked
                  if x['flag_rate'] is not None and x['flag_rate'] >= 0.5)
-    with open(os.path.join(OUT_DIR, 'audit_summary.md'), 'w',
+    with open(os.path.join(out_dir, "audit_summary.md"), 'w',
               encoding='utf-8') as f:
         f.write('# Spectral-consistency audit of HSMM segmentation\n\n'
                 f'{len(recs)} records x 6 limb leads, cache '
@@ -376,16 +384,16 @@ def main():
     # top-N example figures
     for x in ranked[:min(5, len(ranked))]:
         rec, ln = x['record'], x['lead']
-        ecg = np.load(os.path.join(CACHE_DIR, rec, f'lead_{ln}',
+        ecg = np.load(os.path.join(cache_dir, rec, f'lead_{ln}',
                                    'filtered_ecg.npy'))
-        states = np.load(os.path.join(CACHE_DIR, rec, f'lead_{ln}',
+        states = np.load(os.path.join(cache_dir, rec, f'lead_{ln}',
                                       'state_labels.npy'))
         plot_flagged(rec, ln, ecg, states, results[rec][ln]['runs'],
-                     os.path.join(OUT_DIR, f'{rec}_{ln}.png'), fs)
+                     os.path.join(out_dir, f"{rec}_{ln}.png"), fs)
 
     print(f'\nLeads with >=1 flagged beat: {n_any}/{len(ranked)}; '
           f'>=50% beats flagged: {n_half}/{len(ranked)}')
-    print(f'Done. Results -> {OUT_DIR}')
+    print(f'Done. Results -> {out_dir}')
 
 
 if __name__ == '__main__':

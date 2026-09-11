@@ -364,6 +364,10 @@ def main():
     parser.add_argument('--no-plots', action='store_true',
                         help='Skip per-beat PNG generation (data caches '
                              'still written; plots regenerable from cache)')
+    parser.add_argument('--dsp', action='store_true',
+                        help='Use the self-contained classical DSP delineator '
+                             '(DSPECGSegmenter) instead of the HSMM pipeline; '
+                             'P/T provenance becomes "dsp"')
     args = parser.parse_args()
 
     # Output dir
@@ -396,10 +400,11 @@ def main():
     if args.lead:
         llp.LIMB_LEADS = leads_to_process
 
-    processor = LimbLeadProcessor(max_samples=MAX_SAMPLES)
+    processor = LimbLeadProcessor(max_samples=MAX_SAMPLES,
+                                  use_dsp_delineator=args.dsp)
 
     print(f"\n{'='*65}")
-    print(f"  BATCH 6-LEAD LIMB HSMM PROCESSING")
+    print(f"  BATCH 6-LEAD LIMB {'DSP' if args.dsp else 'HSMM'} PROCESSING")
     print(f"  {n_total} records  |  Leads: {leads_to_process}")
     print(f"  Max samples: {MAX_SAMPLES}  |  Output: {OUT_DIR}")
     print(f"{'='*65}\n")

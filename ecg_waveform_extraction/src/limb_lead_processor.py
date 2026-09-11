@@ -25,7 +25,7 @@ import numpy as np
 from .preprocessing import ECGPreprocessor
 from .features import FeatureExtractor
 from .hsmm import HSMMModel, smart_initialize_gmms
-from .segmentation import ECGSegmenter
+from .segmentation import ECGSegmenter, DSPECGSegmenter
 from .extraction.qrs_refiner import (
     refine_qrs_boundaries, compute_qrs_polarity_v2,
 )
@@ -163,15 +163,22 @@ class LimbLeadProcessor:
         on QRS boundaries and annotate each beat dict with ``qrs_on_wd`` /
         ``qrs_off_wd`` plus a per-lead agreement summary in seg_data.
         Read-only: production QRS boundaries are never modified.
+    use_dsp_delineator : bool
+        Replace the HSMM segmenter (and the prominence P/T refinement) with
+        the self-contained classical DSP delineator
+        (:class:`DSPECGSegmenter`).  P/T provenance becomes ``'dsp'``.
+        Default False: the HSMM pipeline is untouched.
     """
 
     def __init__(self, fs: float = 250.0, max_samples: int = 16000,
                  use_prominence_delineation: bool = True,
-                 use_wavelet_crosscheck: bool = True):
+                 use_wavelet_crosscheck: bool = True,
+                 use_dsp_delineator: bool = False):
         self.fs = fs
         self.max_samples = max_samples
         self.use_prominence_delineation = use_prominence_delineation
         self.use_wavelet_crosscheck = use_wavelet_crosscheck
+        self.use_dsp_delineator = use_dsp_delineator
 
     # ------------------------------------------------------------------
     # Public API
@@ -263,19 +270,24 @@ class LimbLeadProcessor:
         prep = ECGPreprocessor(fs=fs_actual)
         clean = prep.preprocess(sig)
 
-        # ---- Step 2: Features ----
-        fe = FeatureExtractor(fs=fs_actual)
-        features = fe.extract(clean)
+        if self.use_dsp_delineator:
+            # ---- Steps 2-3 (DSP): self-contained classical delineator ----
+            seg_result = DSPECGSegmenter(fs=fs_actual,
+                                         preprocessor=prep).segment(sig)
+        else:
+            # ---- Step 2: Features ----
+            fe = FeatureExtractor(fs=fs_actual)
+            features = fe.extract(clean)
 
-        # ---- Step 3: HSMM segment ----
-        model = HSMMModel(fs=fs_actual)
-        model.initialize_with_priors()
-        model.set_left_right_topology()
-        smart_initialize_gmms(model, features)
+            # ---- Step 3: HSMM segment ----
+            model = HSMMModel(fs=fs_actual)
+            model.initialize_with_priors()
+            model.set_left_right_topology()
+            smart_initialize_gmms(model, features)
 
-        seg = ECGSegmenter(preprocessor=prep, feature_extractor=fe,
-                           model=model, fs=fs_actual)
-        seg_result = seg.segment(sig)
+            seg = ECGSegmenter(preprocessor=prep, feature_extractor=fe,
+                               model=model, fs=fs_actual)
+            seg_result = seg.segment(sig)
 
         # ---- Raw segment data for plotting ----
         seg_data = {
@@ -291,8 +303,11 @@ class LimbLeadProcessor:
         # overwrites BeatBoundary p_onset/p_offset/t_onset/t_offset where it
         # finds valid waves; HSMM boundaries stay as the per-beat fallback.
         # QRS boundaries are untouched (package R_on/R_off are exploratory).
+        # Skipped on the DSP path: its boundaries are already final and
+        # carry the 'dsp' provenance this stage would overwrite.
         prom_refined = 0
-        if self.use_prominence_delineation and _HAS_PROMINENCE and seg_result.beats:
+        if self.use_prominence_delineation and _HAS_PROMINENCE \
+                and seg_result.beats and not self.use_dsp_delineator:
             prom_refined = refine_p_t_boundaries(
                 seg_result.beats, clean, fs_actual)
         seg_data['prominence_refined_beats'] = prom_refined

@@ -31,6 +31,9 @@ N_T_SAMPLE = 20
 SEED = 0
 P_LO, P_HI = 40.0, 160.0
 T_LO, T_HI = 80.0, 350.0
+# P/T provenance buckets: 'hsmm' (Stage 1), 'prominence' (Tier-1 refinement),
+# 'dsp' (DSPECGSegmenter path).  Older caches simply lack the 'dsp' bucket.
+SOURCES = ("hsmm", "prominence", "dsp")
 
 
 def clean(a):
@@ -58,16 +61,17 @@ print("=" * 104)
 print(f"PT DELINEATION AUDIT  |  {len(records)} records x {len(LEADS)} leads  |  fs={FS:.0f} Hz")
 print("=" * 104)
 
-dur = {w: {L: {"prominence": [], "hsmm": []} for L in LEADS} for w in ("P", "T")}
+dur = {w: {L: {s: [] for s in SOURCES} for L in LEADS} for w in ("P", "T")}
 durs_all = {w: {L: [] for L in LEADS} for w in ("P", "T")}
 rec_cmp, sentinels = [], 0
-p_sat = {L: {"prominence": [0, 0], "hsmm": [0, 0]} for L in LEADS}      # n_at_99_101, n
+p_sat = {L: {s: [0, 0] for s in SOURCES} for L in LEADS}      # n_at_99_101, n
 part4 = {L: dict(n_beats=0, n_wide=0, wide_with_p=0, wide_p_ovl_qrs=0, wide_p_ovl_prevT=0,
                  wide_p_dur=[], narrow_p_dur=[], all_ovl_prevT=0, all_with_p=0,
                  short_rr_with_p_ovl_prevT=0, n_short_rr=0) for L in LEADS}
 gap_stats = {L: [] for L in LEADS}
-coll = {L: dict(n=0, neg=0, neg_tsrc={"prominence": 0, "hsmm": 0},
-                neg_psrc={"prominence": 0, "hsmm": 0}) for L in LEADS}
+coll = {L: dict(n=0, neg=0,
+                neg_tsrc={s: 0 for s in SOURCES},
+                neg_psrc={s: 0 for s in SOURCES}) for L in LEADS}
 
 for rec in records:
     rdir = os.path.join(BASE, rec)
@@ -159,7 +163,7 @@ for name, lo, hi in (("P", P_LO, P_HI), ("T", T_LO, T_HI)):
     print(f"\n  --- {name} (physiological {lo:.0f}-{hi:.0f} ms) ---")
     for L in LEADS:
         cells = []
-        for src in ("prominence", "hsmm"):
+        for src in SOURCES:
             a = dur[name][L][src]
             cells.append(f"{src:>10}: n={len(a):6d} p5={pct(a,5):6.1f} med={med(a):6.1f} "
                          f"p95={pct(a,95):6.1f} bad={100*np.mean((clean(a)<lo)|(clean(a)>hi)):5.1f}%")
@@ -168,10 +172,10 @@ for name, lo, hi in (("P", P_LO, P_HI), ("T", T_LO, T_HI)):
         print(f"  {name} {L:>3}  " + "  ".join(cells))
 print(f"\n  sentinel/truncated beats excluded (boundary = -1 at signal end): {sentinels}")
 print("  fixed-window saturation (the delineator's hard window, not the wave):")
-print(f"  {'lead':>5}{'P prom %at 99-101ms':>22}{'P hsmm %at 99-101ms':>22}")
+print(f"  {'lead':>5}" + "".join(f"{'P ' + s + ' %at 99-101ms':>22}" for s in SOURCES))
 for L in LEADS:
-    pr_, pn_ = p_sat[L]["prominence"], p_sat[L]["hsmm"]
-    print(f"  {L:>5}{100*pr_[0]/max(pr_[1],1):>21.1f}%{100*pn_[0]/max(pn_[1],1):>21.1f}%")
+    cells = [f"{100*p_sat[L][s][0]/max(p_sat[L][s][1],1):>21.1f}%" for s in SOURCES]
+    print(f"  {L:>5}" + "".join(cells))
 
 # ==================================================================================
 print("\n" + "#" * 104)
@@ -209,10 +213,10 @@ print(f"PART 3  T-wave evidence ({N_T_SAMPLE} sampled records for waveform work)
 print("#" * 104)
 rng = np.random.default_rng(SEED)
 sample = list(rng.choice(records, size=min(N_T_SAMPLE, len(records)), replace=False))
-mis = {L: {"prominence": [0, 0], "hsmm": [0, 0]} for L in LEADS}
+mis = {L: {s: [0, 0] for s in SOURCES} for L in LEADS}
 pos = {L: [] for L in LEADS}
-runlen = {L: {"hsmm": [], "prominence": []} for L in LEADS}
-floor60 = {L: {"hsmm": 0, "prominence": 0} for L in LEADS}
+runlen = {L: {s: [] for s in SOURCES} for L in LEADS}
+floor60 = {L: {s: 0 for s in SOURCES} for L in LEADS}
 for rec in sample:
     for L in LEADS:
         d = os.path.join(BASE, rec, f"lead_{L}")
@@ -252,7 +256,7 @@ print(f"  sampled records: {len(sample)}   (T-peak search window: s_offset+5 .. 
 print(f"\n  {'lead':>5}{'src':>11}{'n_T':>6}{'% peak OUTSIDE decoded T':>27}"
       f"{'peak-pos p5':>13}{'med':>7}{'p95':>7}{'%pos>=0.8':>11}{'%dur==60ms':>12}")
 for L in LEADS:
-    for src in ("prominence", "hsmm"):
+    for src in SOURCES:
         m = mis[L][src]
         r = np.array(runlen[L][src], dtype=float)
         p = np.array(pos[L])
@@ -270,9 +274,9 @@ for L in LEADS:
 print("  collisions (gap<0) by source  [T src of the beat | P src of the next beat]:")
 for L in LEADS:
     g = coll[L]
-    print(f"    {L:>3}: {g['neg']:>4}/{g['n']}  T: prom={g['neg_tsrc']['prominence']:>4}"
-          f" hsmm={g['neg_tsrc']['hsmm']:>4} | next-P: prom={g['neg_psrc']['prominence']:>4}"
-          f" hsmm={g['neg_psrc']['hsmm']:>4}")
+    t_part = " ".join(f"{s}={g['neg_tsrc'][s]:>4}" for s in SOURCES)
+    p_part = " ".join(f"{s}={g['neg_psrc'][s]:>4}" for s in SOURCES)
+    print(f"    {L:>3}: {g['neg']:>4}/{g['n']}  T: {t_part} | next-P: {p_part}")
 
 # ==================================================================================
 print("\n" + "#" * 104)
