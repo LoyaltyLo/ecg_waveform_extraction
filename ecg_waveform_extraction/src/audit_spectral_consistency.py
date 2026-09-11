@@ -26,7 +26,7 @@ Method (per lead):
 Outputs under output/rala_full/_spectral_audit/:
   audit_results.json   full run/beat-level detail
   audit_summary.md     thresholds, metric distributions, ranked list
-  <rec>_<lead>.png     top suspicious examples (flagged runs outlined red)
+  <rec>_<lead>.png     top suspicious examples (flag counts in the title)
 
 Usage:
     python -m ecg_waveform_extraction.src.audit_spectral_consistency --n 200
@@ -258,18 +258,13 @@ def print_distributions(all_runs):
 
 
 def plot_flagged(rec, ln, ecg, states, runs, save_path, fs, dpi=130):
-    """Signal + P/QRS/T bands; flagged runs outlined in red (status color)."""
+    """Signal + P/QRS/T bands; flagged counts in the title only (no boxes)."""
     t = np.arange(len(ecg)) / fs
     fig, ax = plt.subplots(figsize=(13, 4.2), constrained_layout=True)
     _fill_qpt(ax, t, ecg, states, alpha=0.30)
     ax.plot(t, ecg, color='#1565c0', lw=0.8)
 
     from matplotlib.patches import Patch
-    for r in runs:
-        if r.get('flag'):
-            ax.axvspan(r['i0'] / fs, r['i1'] / fs, facecolor='none',
-                       edgecolor='#d32f2f', lw=1.8, alpha=0.9, zorder=3)
-
     n_flag = sum(1 for r in runs if r.get('flag'))
     tiny = sum(1 for r in runs if r.get('tiny'))
     ax.set_title(f'{rec} — {ln}   flagged runs: {n_flag}   tiny runs: {tiny}',
@@ -278,8 +273,6 @@ def plot_flagged(rec, ln, ecg, states, runs, save_path, fs, dpi=130):
     ax.tick_params(labelsize=8)
     ax.grid(True, alpha=0.12)
     handles = [Patch(facecolor=c, label=g) for g, c in GROUP_COLORS.items()]
-    handles.append(Patch(facecolor='none', edgecolor='#d32f2f', lw=1.8,
-                         label='flagged'))
     ax.legend(handles=handles, loc='upper right', fontsize=8, framealpha=0.9)
     fig.savefig(save_path, dpi=dpi)
     plt.close(fig)
