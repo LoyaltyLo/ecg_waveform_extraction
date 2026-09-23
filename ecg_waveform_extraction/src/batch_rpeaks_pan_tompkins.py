@@ -38,9 +38,10 @@ Usage:
 
 Outputs
 -------
-    <out-dir>/plots/<record>.png     4x3 figure, per-lead detections
-    <out-dir>/summary_by_lead.csv    666 x 12 rows, one per (record, lead)
-    <out-dir>/summary_by_record.csv  666 rows, descriptive cross-lead stats
+    <out-dir>/plots/<record>.png                  4x3 figure, per-lead detections
+    <out-dir>/plots_per_lead/<record>/<lead>.png  one figure per (record, lead)
+    <out-dir>/summary_by_lead.csv                 666 x 12 rows, one per (record, lead)
+    <out-dir>/summary_by_record.csv               666 rows, descriptive cross-lead stats
 """
 
 import sys
@@ -118,9 +119,37 @@ def beat_stats(beats: np.ndarray, fs: float) -> dict:
             'min_RR_ms': np.nan, 'max_RR_ms': np.nan}
 
 
-def process_record(rec: dict, out_png: str) -> tuple[list[dict], dict]:
-    """Detect on all 12 leads of one record, save its figure, return metrics.
+def save_single_lead_figure(rec_name: str, lead: str, mv: np.ndarray, fs: float,
+                            beats: np.ndarray, status: str, st: dict,
+                            out_png: str, dev_hr=None):
+    """Save one lead's signal with its own Pan-Tompkins detections as a PNG."""
+    fig, ax = plt.subplots(figsize=(12, 3.5))
+    t = np.arange(len(mv)) / fs
+    ax.plot(t, mv, color='k', linewidth=0.7)
+    if len(beats):
+        ax.plot(t[beats], mv[beats], 'o', color='#d32f2f', markersize=5, zorder=5)
+    if status == 'flat':
+        title = f"{rec_name} — lead {lead}  |  flat lead (no detection)"
+    elif st['n_beats'] >= 2:
+        title = (f"{rec_name} — lead {lead}  |  Pan-Tompkins: {st['n_beats']} R peaks, "
+                 f"HR {st['mean_HR_bpm']:.1f} bpm"
+                 + (f"  (device {dev_hr:.0f})" if dev_hr else ''))
+    else:
+        title = f"{rec_name} — lead {lead}  |  {st['n_beats']} R peaks"
+    ax.set_title(title, fontsize=11, fontweight='bold')
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('mV')
+    ax.grid(True, alpha=0.25)
+    fig.tight_layout()
+    fig.savefig(out_png, dpi=100)
+    plt.close(fig)
 
+
+def process_record(rec: dict, out_png: str, per_lead_dir: str | None = None) -> tuple[list[dict], dict]:
+    """Detect on all 12 leads of one record, save its figures, return metrics.
+
+    Saves the 4x3 overview to out_png and, if per_lead_dir is given, one
+    single-lead figure per lead into that directory.
     Returns (per_lead_rows, per_record_row).
     """
     sigs = rec['signals']
@@ -165,6 +194,10 @@ def process_record(rec: dict, out_png: str) -> tuple[list[dict], dict]:
             ax.plot(t, mv, color='k', linewidth=0.6)
             if len(beats):
                 ax.plot(t[beats], mv[beats], 'o', color='#d32f2f', markersize=4, zorder=5)
+            if per_lead_dir:
+                save_single_lead_figure(rec['filename'], lead, mv, fs, beats, status,
+                                        beat_stats(beats, fs),
+                                        os.path.join(per_lead_dir, f'{lead}.png'), dev_hr)
 
             st = beat_stats(beats, fs)
             if status == 'flat':
@@ -222,6 +255,7 @@ def main():
     args = ap.parse_args()
 
     plots_dir = os.path.join(args.out_dir, 'plots')
+    per_lead_base = os.path.join(args.out_dir, 'plots_per_lead')
     os.makedirs(plots_dir, exist_ok=True)
 
     files = sorted(f for f in os.listdir(args.data_dir) if f.endswith('.aECG'))
@@ -235,7 +269,10 @@ def main():
             rec = parse_aecg(os.path.join(args.data_dir, fname))
             if not rec['signals']:
                 raise ValueError('no lead signals parsed')
-            lr, rr = process_record(rec, os.path.join(plots_dir, f"{rec['filename']}.png"))
+            rec_dir = os.path.join(per_lead_base, rec['filename'])
+            os.makedirs(rec_dir, exist_ok=True)
+            lr, rr = process_record(rec, os.path.join(plots_dir, f"{rec['filename']}.png"),
+                                    per_lead_dir=rec_dir)
             lead_rows.extend(lr)
             rec_rows.append(rr)
         except Exception as e:
