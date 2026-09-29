@@ -40,6 +40,7 @@ class WaveletBeat:
     qrs_offset: int = -1
     p_onset: int = -1
     p_offset: int = -1
+    t_peak: int = -1
     t_onset: int = -1
     t_offset: int = -1
 
@@ -85,6 +86,22 @@ class WaveletStage:
         wavedet detects its own beats (no external R-peaks API), so the
         returned beats may not align 1:1 with HSMM beats — use
         :func:`crosscheck_qrs_boundaries` for R-anchored matching.
+
+        NOTE: the P/T marks inside the returned beats are positionally
+        indexed into wavedet's per-event arrays, whose NaN slots do not
+        line up beat-for-beat with the QRS arrays (observed on real data).
+        For P/T work use :meth:`delineate_raw` and anchor marks yourself.
+        """
+        return self.delineate_raw(ecg_clean)[0]
+
+    def delineate_raw(self, ecg_clean: np.ndarray):
+        """Delineate one lead, returning (beats, raw wavedet Delineation).
+
+        ``beats`` is what :meth:`delineate` returns. The raw ``Delineation``
+        exposes the un-truncated per-event mark arrays (r, qrs_on, qrs_off,
+        t, t_on, t_off, p, ...) so callers can re-anchor P/T marks with their
+        own logic instead of trusting positional alignment. Returns
+        ([], None) if wavedet raises on the signal.
         """
         sig = np.asarray(ecg_clean, dtype=np.float64)
         try:
@@ -92,7 +109,7 @@ class WaveletStage:
         except Exception:
             # upstream raises on degenerate signals; mirror the per-lead
             # try/catch of wavedet_interface.m by returning no beats
-            return []
+            return [], None
 
         beats = []
         for i in range(len(d.qrs_on)):
@@ -103,10 +120,11 @@ class WaveletStage:
                 qrs_offset=_idx(d.qrs_off[i]),
                 p_onset=_idx(d.p_on[i]),
                 p_offset=_idx(d.p_off[i]),
+                t_peak=_idx(d.t[i]),
                 t_onset=_idx(d.t_on[i]),
                 t_offset=_idx(d.t_off[i]),
             ))
-        return beats
+        return beats, d
 
 
 def crosscheck_qrs_boundaries(beats, ecg_clean: np.ndarray, fs: float,
