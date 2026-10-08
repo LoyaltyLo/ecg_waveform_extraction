@@ -32,6 +32,12 @@ the PR interval. Library implementations only:
   QRS onset — the P is the last wave before the QRS; amplitude-max would
   let T-tail/U-wave debris steal the slot, as the T-stage smoke data
   proved).
+- **Two-library boundary fusion**: both libraries run P offsets late (bias
+  vs device: onset ~-5.5 ms, offset ~+21.5 ms). When the other family
+  delineates the same physical P (peak within 40 ms), the reported window
+  is the INTERSECTION (on = max of onsets, off = min of offsets) — guarded
+  to stay non-degenerate and peak-containing; `p_source` records
+  prom / prom_inv / wd / fused pairs.
 - False-P control (the core of "judging" a P): the repo's
   `_p_passes_snr` gate — the detrended P amplitude must exceed 2.5x the
   MAD-based noise sigma of the quiet TP window just before the P onset
@@ -41,35 +47,44 @@ the PR interval. Library implementations only:
 Per-beat sanity flags (never drops): P duration outside 40-200 ms
 (`sane_p`), PR interval outside 80-300 ms (`sane_pr`).
 
-Validation (all 666 records, 2026-10)
+Validation (all 666 records, 2026-10, with boundary fusion)
 -------------------------------------
-0 errors in 1680 s. The 13,319 beat rows and every ref_lead are bit-identical
+0 errors in 1481 s. The 13,319 beat rows and every ref_lead are bit-identical
 to the T-stage CSVs (anchor parity). Of 11,448 TP segments (beats with a QRS
 window whose predecessor carries an in-window T): a P candidate was found in
 11,391 (99.5%), survived the geometry gate in 11,027 (96.3%) and the SNR gate
 in 10,410 (91.0% of segments) — the gate rejected 981 found candidates as
-local noise, which is the false-P control working.
+local noise, which is the false-P control working. 6,875 of the 10,410
+passing P waves (66%) were boundary-fused across the two library families.
 
-PR interval vs device `PR_ms` (n=642 records with both measured): median
-|delta| 13.0 ms, P90 46.9, within 30 ms 81.0%; signed median +5.5 ms.
-P duration vs device `P_dur` (n=642): median |delta| 27.8 ms, within 30 ms
-55.9% — both libraries delineate P onsets/offsets wider than the device
-(documented generosity, flagged via sane_p, not forced).
+Boundary accuracy vs device (n=642 records with both measured), fusion
+effect in brackets vs the unfused first run:
+- P duration: median |delta| 10.0 ms [was 27.8], P90 33.4 [47.5], within
+  30 ms 85.4% [55.9%]. Signed +6.0 ms, IQR [-1, +16] — onset bias ~-1 ms,
+  offset bias ~+5 ms (was -5.5 / +21.5: the intersection window removed
+  three quarters of the offset lateness both libraries share).
+- PR interval: median |delta| 11.0 ms [13.0], within 30 ms 83.8% [81.0%];
+  signed median +1.0 ms [was +5.5] — effectively unbiased, at the device's
+  own measurement noise floor.
 
-Sanity flags: sane_p 10,933/11,027 (99.1%), sane_pr 10,767/11,027 (97.6%).
+Two fused-run lessons, kept for the record: (a) the SNR gate must run on
+the PICKED LIBRARY'S OWN window, not the trimmed intersection — gating on
+the fused window cuts the P flanks and falsely rejects real P waves (first
+fused run: gate pass rate fell 91.4% -> 86.8%, 12 extra low-P records;
+fixed, pass rate restored to exactly 91.4%); (b) amplitude-max selection
+lets T-tail/U-wave debris steal the P slot (smoke-proven: 180522WU7Y PR
+error +85 ms wrong, +14 ms after the closest-to-QRS key).
+
+Sanity flags: sane_p 10,909/11,027 (98.9%), sane_pr 10,774/11,027 (97.7%).
 Polarity of passing P waves: 4,873 positive (46.8%), 3,321 flat (31.9%),
 2,216 negative (21.3%) — the flat/negative share fits the RA-LA reversal
 morphology (inverted/near-flat P in V1-V2, negative in AVR).
 
-P presence: median record p_rate 1.00 (409 records exactly 1.0); 19 records
-below 0.5, honestly reported (e.g. 2112155IE6: 0/7 on V1 despite device PR
-173 — pool/SNR failure, not forced). Of the 53 records whose interpretation
-mentions AF/atrial terms, median p_rate 0.86 vs 1.00 for the rest
+P presence: median record p_rate 1.00; 19 records below 0.5, honestly
+reported (e.g. 2112155IE6: 0/7 on V1 despite device PR 173 — pool/SNR
+failure, not forced). Records whose interpretation mentions AF
+(房颤/心房颤动/AF/atrial) have median p_rate 0.78 vs 1.00 for the rest
 (informational cross-check, not a gate).
-
-Selection-key finding (smoke-proven): amplitude-max lets T-tail/U-wave debris
-steal the P slot (180522WU7Y: PR +85 ms wrong; after switching the final key
-to SNR-then-closest-to-QRS: +14 ms, matching device p_peak ~90 ms).
 
 Usage:
     python src/batch_pwave_reflead.py [--limit N] [--records A,B,C]
@@ -120,6 +135,7 @@ FLAT_P_AMP_MV = 0.03
 P_SANE_MS = (40.0, 200.0)
 PR_SANE_MS = (80.0, 300.0)
 P_BEFORE_QRS_MS = (40.0, 320.0)   # plausible P-peak latency before qrs_on
+FUSE_PEAK_MS = 40.0               # cross-library peak distance = same physical P
 
 
 def _f2i(value) -> int:
@@ -205,18 +221,21 @@ def process_record(rec: dict, t_rows: pd.DataFrame, prep: ECGPreprocessor,
     clean = prep.preprocess(sigs[ref_lead])
 
     # ---- P candidate pool: prominence (upright + inverted) + wavedet ----
+    # entries are (peak, onset, offset, kind); kind family: prominence
+    # ('prom'/'prom_inv') vs wavedet ('wd') — used by the boundary fusion.
     pool = []
     for pb in prom.delineate(clean, r_idx):
-        for pk, on, off in ((pb.p_peak, pb.p_onset, pb.p_offset),
-                            (pb.p_inv_peak, pb.p_inv_onset, pb.p_inv_offset)):
+        for kind, pk, on, off in (('prom', pb.p_peak, pb.p_onset, pb.p_offset),
+                                  ('prom_inv', pb.p_inv_peak, pb.p_inv_onset,
+                                   pb.p_inv_offset)):
             if pk >= 0 and on >= 0 and off >= 0 and on < off and on <= pk <= off:
-                pool.append((pk, on, off))
+                pool.append((pk, on, off, kind))
     _wd, d_raw = stage.delineate_raw(clean)
     if d_raw is not None:
         for j in range(len(d_raw.p)):
             pk, on, off = _f2i(d_raw.p[j]), _f2i(d_raw.p_on[j]), _f2i(d_raw.p_off[j])
             if pk >= 0 and on >= 0 and off >= 0 and on < off:
-                pool.append((pk, on, off))
+                pool.append((pk, on, off, 'wd'))
 
     lo_lat, hi_lat = (int(a * fs / 1000.0) for a in P_BEFORE_QRS_MS)
 
@@ -230,6 +249,7 @@ def process_record(rec: dict, t_rows: pd.DataFrame, prep: ECGPreprocessor,
             'seg_start_ms': np.nan, 'seg_end_ms': np.nan,
             'has_segment': False,
             'p_found': False, 'in_window': False, 'passes_snr': np.nan,
+            'p_source': '',
             'p_peak_ms': np.nan, 'p_on_ms': np.nan, 'p_off_ms': np.nan,
             'p_dur_ms': np.nan, 'p_amp_mv': np.nan, 'p_polarity': '',
             'pr_ms': np.nan, 'sane_p': np.nan, 'sane_pr': np.nan,
@@ -262,22 +282,47 @@ def process_record(rec: dict, t_rows: pd.DataFrame, prep: ECGPreprocessor,
             # p_peak ~90 ms, amplitude-max picked a 156 ms bump). Final
             # key therefore: plausible -> contained -> passes SNR ->
             # closest peak to the QRS onset.
-            pk, on, off = max(cands, key=lambda tr: (
+            pk, on, off, kind = max(cands, key=lambda tr: (
                 lo_lat <= seg_end - tr[0] <= hi_lat,        # plausible latency
                 tr[1] >= seg_start and tr[2] <= seg_end,    # full containment
                 _p_passes_snr(clean, tr[1], tr[2], fs, ref_floor=seg_start),
                 -(seg_end - tr[0])))                        # nearest the QRS
+            # Existence judgement (SNR gate) runs on the PICKED LIBRARY'S
+            # OWN window: fusion below only refines the reported boundaries
+            # and must not alter whether a P counts — computing the gate on
+            # the trimmed intersection cuts the P flanks and falsely
+            # rejects real P waves (first fused full run lost exactly this:
+            # gate pass rate 91.4% -> 86.8%).
+            gate = _p_passes_snr(clean, on, off, fs, ref_floor=seg_start)
+            # ---- two-library boundary fusion (intersection window) ----
+            # Both libraries run their P offsets late (full-run bias: onset
+            # ~-5.5 ms, offset ~+21.5 ms vs device). When the OTHER family
+            # delineates the same physical P (peak within FUSE_PEAK_MS),
+            # take the intersection: on = max(on), off = min(off) — the
+            # earlier-offset library pulls the window back in. Guarded so
+            # the fused window stays non-degenerate and still contains the
+            # peak; otherwise the picked library's window stands.
+            fam = 0 if kind.startswith('prom') else 1
+            partners = [tr for tr in cands
+                        if (0 if tr[3].startswith('prom') else 1) != fam]
+            if partners:
+                q = min(partners, key=lambda tr: abs(tr[0] - pk))
+                if abs(q[0] - pk) <= int(FUSE_PEAK_MS / 1000.0 * fs):
+                    fon, foff = max(on, q[1]), min(off, q[2])
+                    if fon < foff and fon <= pk <= foff:
+                        on, off = fon, foff
+                        kind = f'{kind}+{q[3]}'
             plausible = lo_lat <= seg_end - pk <= hi_lat
             contained = on >= seg_start and off <= seg_end
             row['p_found'] = True
+            row['p_source'] = kind
             row.update(p_peak_ms=round(pk / fs * 1000.0, 1),
                        p_on_ms=round(on / fs * 1000.0, 1),
                        p_off_ms=round(off / fs * 1000.0, 1),
                        p_dur_ms=round((off - on) / fs * 1000.0, 1),
                        in_window=bool(plausible and contained))
             if row['in_window']:
-                row['passes_snr'] = bool(_p_passes_snr(clean, on, off, fs,
-                                                       ref_floor=seg_start))
+                row['passes_snr'] = bool(gate)   # library window, pre-fusion
                 row['pr_ms'] = round((seg_end - on) / fs * 1000.0, 1)
                 row['p_amp_mv'] = round(float(mv_ref[pk]), 4)
                 row['p_polarity'] = p_polarity(row['p_amp_mv'])
@@ -363,6 +408,7 @@ def process_record(rec: dict, t_rows: pd.DataFrame, prep: ECGPreprocessor,
         'n_segments': n_seg,
         'n_p_found': int(sum(r_['p_found'] for r_ in beat_rows)),
         'n_p_pass': len(p_ok),
+        'n_fused': sum(1 for r_ in p_ok if '+' in r_['p_source']),
         'p_rate': round(len(p_ok) / n_seg, 3) if n_seg else np.nan,
         'p_dur_median_ms': round(float(np.median(durs)), 1) if durs.size else np.nan,
         'p_dur_delta_ms': (round(float(np.median(durs)) - dev_pdur, 1)
@@ -450,6 +496,7 @@ def main():
     okb = df_beat[df_beat['passes_snr'] == True]  # noqa: E712
     if len(okb):
         print('P polarity:', okb['p_polarity'].value_counts().to_dict())
+        print('P source:', okb['p_source'].value_counts().to_dict())
     ok = df[df['device_P_dur_ms'] > 0].dropna(subset=['p_dur_median_ms'])
     if len(ok):
         d = ok['p_dur_delta_ms'].abs()
