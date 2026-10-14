@@ -20,44 +20,48 @@ Classification per (record, beat, lead, wave):
   noise = 1.4826 * MAD(baseline window), snr = abs_amp / noise.
 - biphasic: the second-largest SIGNIFICANT deflection (baseline-crossing
   runs >= MIN_DEFLECTION_MS long — noise slivers dropped) is OPPOSITE-signed
-  to the largest and clears the floor / PHASE_RATIO / 2x-noise gates; the
-  time order is kept as pattern '+-' / '-+' (in V1 the P pattern is the
-  RA-LA reversal signature).  flat: primary excursion < FLAT_FLOOR_MV or
+  to the largest and clears the floor / amplitude-ratio / AREA-ratio /
+  2x-noise gates — a real second phase carries comparable charge
+  (integral, mV*ms), not just a deep narrow spike; the time order is kept
+  as pattern '+-' / '-+' (in V1 the P pattern is the RA-LA reversal
+  signature).  flat: primary excursion < FLAT_FLOOR_MV or
   snr < AMP_NOISE_RATIO;  otherwise positive / negative by the dominant
   excursion.
 
-Validation (all 666 records, 2026-10, biphasic v2: deflection-level rules)
+Validation (all 666 records, 2026-10, biphasic v3: amplitude + area gates)
 --------------------------------------
-0 errors in 2711 s. 159,828 (beat x lead) rows = 13,319 beats x 12 leads;
+0 errors in 2603 s. 159,828 (beat x lead) rows = 13,319 beats x 12 leads;
 8,658 figures. Polarity counts (pos / neg / biphasic / flat):
-P 68,294 / 30,918 / 24,268 (15.2%, patterns +- 18,815 / -+ 5,453) / 1,440;
-QRS 38,642 / 29,014 / 77,364 (48.4%, +- 66,331 / -+ 11,033) / 396;
-T 88,902 / 32,604 / 20,444 (12.8%, +- 9,825 / -+ 10,619) / 838.
+P 78,592 / 35,816 / 9,072 (5.7%, patterns +- 7,297 / -+ 1,775) / 1,440;
+QRS 55,906 / 50,358 / 38,756 (24.2%, +- 33,353 / -+ 5,403) / 396;
+T 98,743 / 37,405 / 5,802 (3.6%, +- 2,233 / -+ 3,569) / 838.
+v2 -> v3 (requested biphasic reduction): P 15.2 -> 5.7%, QRS 48.4 ->
+24.2%, T 12.8 -> 3.6%.
 
 Physiology checks (the stage's own ground truth):
-- aVR (P/QRS/T must be negative-or-biphasic in normal conduction): 84% /
-  94% / 80% — the 94% QRS figure is the aVR-typical rs complex now
-  correctly labeled biphasic by the 1/3-ratio second-deflection rule.
-- Sinus-rhythm records (n=595) on lead II: P+ 77%, QRS+ 61%, T+ 77%.
-- V1 biphasic P pattern: '+-' 3,240 vs '-+' 167 beats (19:1) — normal
-  sinus P in V1 is positive-then-terminal-negative; the reversal-group
-  (18xx/19xx) '-+' share is 7.5% vs 4.1% for 20xx+ (weak alone, one
-  feature among many).
-- Reversal probe: 7 records show aVR-dominant-positive QRS with device
+- Sinus-rhythm records (n=595) on lead II: P+ 87%, QRS+ 78%, T+ 83% (was
+  77/61/77 in v2 — fewer false biphasic labels expose the dominant
+  direction, the reversal-relevant signal).
+- aVR (P/QRS/T negative-or-biphasic in normal conduction): 83% / 87% / 79%.
+- V1 biphasic P pattern: '+-' 1,634 vs '-+' 69 beats (24:1) — the normal
+  sinus P signature survives the tightening, now with less noise around
+  it.
+- Reversal probe: 15 records show aVR-dominant-positive QRS with device
   P_axis in the normal 0-90 range (report-only candidates).
 
 Biphasic-rule calibration history (kept so the thresholds are traceable):
 - v0 window-extremum both-excursion rules: 57-76% of QRS bogus-biphasic
   (the r/s notch of any normal qRs clears relative thresholds).
-- v1 deflection-level without sign constraint / without sliver filter:
-  same-sign r' counted as the second phase; noise wobble created phases.
-- v2 (current): deflections = baseline-crossing runs >= MIN_DEFLECTION_MS
-  (slivers dropped); biphasic needs the second-largest deflection
-  OPPOSITE-signed and >= 1/3 of the primary for QRS (accompanying q/s of
-  Rs/qRs is morphology, not a biphasic complex; at 1/10 the chest-lead
-  rS population reads 69% biphasic); P/T keep 1/10 and 1/15 (their minor
-  phase is genuinely small). Patterns '+-'/'-+' and the per-wave
-  significant-deflection count (qRs -> 3) are exported.
+- v1 deflection-level without sign constraint / sliver filter: same-sign
+  r' counted as the second phase; noise wobble created phases.
+- v2 deflection runs + sliver filter + opposite-sign + amplitude ratio
+  (QRS 1/3): QRS 48.4% biphasic — chest-lead rS of this reversal dataset
+  clears 1/3 on amplitude despite being a narrow deep spike.
+- v3 (current): amplitude ratios raised (QRS 1/2, P/T 1/4) AND a new AREA
+  gate (secondary deflection integral >= 1/2 of the primary's, mV*ms) —
+  a real second phase carries comparable charge. QRS biphasic is now
+  reserved for genuinely two-dominant-deflection complexes (aVR-style qr,
+  V1-V3 rS with comparable area).
 - P polarity is PR-baseline-referenced and intentionally does NOT match
   the upstream single-sample peak polarity (66% agreement; V1 biphasic P
   is real morphology); T cross-check agrees 89.7%.
@@ -114,12 +118,15 @@ WAVE_COLOR = {'P': '#2e7d32', 'QRS': '#d32f2f', 'T': '#1976d2'}
 # rules measured 57-76% bogus biphasic on normal qRs). The time order of
 # the two deflections is kept as the pattern '+-' / '-+' — in V1 the P
 # pattern is the RA-LA reversal signature (normal sinus P is +- there).
-PHASE_RATIO = {'P': 0.10, 'QRS': 0.33, 'T': 0.15}   # biphasic: secondary >= this x primary
-# QRS note: the secondary deflection must reach ONE THIRD of the primary —
-# the accompanying s/q of a normal Rs/qRs is typically 10-30% of R and is
-# morphology, not a biphasic complex; at ratio 0.10 a correct
-# second-deflection rule reads 69% of chest-lead QRS as biphasic (measured).
-# True biphasic QRS = two comparable deflections (aVR-style qr/rs).
+PHASE_RATIO = {'P': 0.25, 'QRS': 0.50, 'T': 0.25}   # biphasic: secondary AMP >= this x primary
+AREA_RATIO = {'P': 0.50, 'QRS': 0.50, 'T': 0.50}    # ... and secondary AREA >= this x primary
+# v3 tightening (reduce false biphasic): amplitude alone lets a deep-but-
+# narrow S wave clear the ratio (chest-lead rS of this reversal dataset,
+# 48% biphasic at ratio 1/3). A real second PHASE carries charge: the
+# secondary deflection must also cover >= AREA_RATIO of the primary's
+# integral (mV*ms). QRS amplitude ratio raised to 1/2 — biphasic QRS is now
+# reserved for genuinely two-dominant-deflection complexes (aVR-style qr);
+# P/T at 1/4 keep the V1 terminal-negative P pattern (its area survives).
 BIPHASIC_FLOOR_MV = {'P': 0.03, 'QRS': 0.10, 'T': 0.05}   # ... and >= this floor
 FLAT_FLOOR_MV = {'P': 0.015, 'QRS': 0.1, 'T': 0.02}       # primary below -> 'flat'
 AMP_NOISE_RATIO = 1.5       # primary below this SNR -> 'flat'
@@ -170,13 +177,13 @@ def _baseline(x: np.ndarray, fs: float, p_on: int, t_off: int, qrs_on: int) -> t
     return best[0], best[1]
 
 
-def _deflections(v: np.ndarray, fs: float, min_ms: float) -> list[tuple[int, float]]:
-    """(sign, amplitude) of the waveform's deflections, in time order.
+def _deflections(v: np.ndarray, fs: float, min_ms: float) -> list[tuple[int, float, float]]:
+    """(sign, amplitude, area_mVms) of the deflections, in time order.
 
     A deflection is a maximal run of samples on one side of the baseline
-    (zero — ``v`` is baseline-centered); its amplitude is the extremum of
-    the run. Runs shorter than ``min_ms`` are noise slivers and dropped:
-    near-baseline wobble must not create phases.
+    (zero — ``v`` is baseline-centered); amplitude is the run extremum,
+    area is |integral| of the run (mV*ms — the charge the phase carries).
+    Runs shorter than ``min_ms`` are noise slivers and dropped.
     """
     min_n = max(1, int(min_ms / 1000.0 * fs))
     out = []
@@ -185,35 +192,40 @@ def _deflections(v: np.ndarray, fs: float, min_ms: float) -> list[tuple[int, flo
         if i == len(v) or (v[i] >= 0) != (v[start] >= 0):
             seg = v[start:i]
             amp = float(seg.max() if seg[0] >= 0 else seg.min())
+            area = abs(float(np.trapz(seg, dx=1.0 / fs))) * 1000.0   # mV*ms
             if len(seg) >= min_n and amp != 0.0:
-                out.append((1 if seg[0] >= 0 else -1, abs(amp)))
+                out.append((1 if seg[0] >= 0 else -1, abs(amp), area))
             start = i
     return out
 
 
 def classify(v_pos: float, v_neg: float, noise: float, wave: str,
-             defls: list[tuple[int, float]]) -> tuple[str, str, int]:
+             defls: list[tuple[int, float, float]]) -> tuple[str, str, int]:
     """(polarity, biphasic_pattern, n_significant_deflections).
 
     flat: primary excursion below the wave's floor or SNR. biphasic: the
     SECOND-largest significant (sliver-filtered) deflection is OPPOSITE-signed
-    to the largest, clears the floor / ratio / 2x-noise gates; the pattern
-    '+-' / '-+' records which deflection comes first in time. Same-sign
-    second deflections (r + r' in rsR') never create a biphasic label.
-    n_significant counts deflections clearing the absolute floor (qRs -> 3,
-    qr/rs -> 2) for morphology analysis.
+    to the largest, clears the floor / amplitude-ratio / area-ratio /
+    2x-noise gates — a real second PHASE carries comparable charge, not
+    just a deep narrow spike; the pattern '+-' / '-+' records which
+    deflection comes first in time. Same-sign second deflections (r + r'
+    in rsR') never create a biphasic label. n_significant counts
+    deflections clearing the absolute floor (qRs -> 3, qr/rs -> 2).
     """
     primary = max(v_pos, v_neg)
-    n_sig = sum(1 for _, a in defls if a >= BIPHASIC_FLOOR_MV[wave])
+    n_sig = sum(1 for d in defls if d[1] >= BIPHASIC_FLOOR_MV[wave])
     if primary < FLAT_FLOOR_MV[wave] or (noise > 1e-9 and primary / noise < AMP_NOISE_RATIO):
         return 'flat', '', n_sig
     if len(defls) >= 2:
         order = sorted(range(len(defls)), key=lambda k: defls[k][1], reverse=True)
-        s1, a1 = defls[order[0]]
-        s2, a2 = defls[order[1]]
-        if s1 != s2 and a2 >= max(BIPHASIC_FLOOR_MV[wave], PHASE_RATIO[wave] * a1) \
+        i1, i2 = order[0], order[1]
+        s1, a1, ar1 = defls[i1]
+        s2, a2, ar2 = defls[i2]
+        if s1 != s2 \
+                and a2 >= max(BIPHASIC_FLOOR_MV[wave], PHASE_RATIO[wave] * a1) \
+                and ar2 >= AREA_RATIO[wave] * ar1 \
                 and (noise <= 1e-9 or a2 / noise >= 2.0):
-            first = s1 if order[0] < order[1] else s2
+            first = s1 if i1 < i2 else s2
             return 'biphasic', '+-' if first > 0 else '-+', n_sig
     return ('positive' if v_pos >= v_neg else 'negative'), '', n_sig
 
