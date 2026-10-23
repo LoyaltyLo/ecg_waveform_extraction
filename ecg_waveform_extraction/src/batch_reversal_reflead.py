@@ -46,6 +46,8 @@ Outputs (output/reversal_reflead/)
 ----------------------------------
 reversal_by_record.csv : verdict, score, fired rules with values,
     agreement vs the device flag, differential notes (666 rows).
+reversal_simple.csv : quick-read table — record, lead-I P/QRS/T
+    polarity and the verdict, Chinese values, 5 columns total.
 plots/<record>.png     : 12-lead figure for every triggered or
     device-flagged record — spans + polarity glyphs as in the polarity
     stage, lead I / aVR highlighted, verdict in the suptitle.
@@ -336,6 +338,26 @@ def main() -> int:
         df.to_csv(out_dir / 'reversal_by_record.new.csv', index=False,
                   encoding='utf-8-sig')
         print('WARNING: reversal_by_record.csv locked; wrote .new.csv')
+
+    # quick-read CSV: record + lead-I wave polarity + verdict, Chinese
+    pol_cn = {'positive': '正向', 'negative': '负向', 'biphasic': '双相',
+              'flat': '平坦'}
+    verd_cn = {'definite': '确证反接', 'probable': '可能反接',
+               'suspicious': '可疑反接', 'none': '正常连接',
+               'poor_P': 'P证据不足'}
+    simple = df[['record', 'verdict']].merge(
+        base[['record', 'I_P', 'I_QRS', 'I_T']], on='record')
+    for c in ('I_P', 'I_QRS', 'I_T'):
+        simple[c] = simple[c].map(pol_cn).fillna('—')
+    simple['verdict'] = simple['verdict'].map(verd_cn)
+    simple.columns = ['记录号', 'P波(I导)', 'QRS波(I导)', 'T波(I导)', '结论']
+    try:
+        simple.to_csv(out_dir / 'reversal_simple.csv', index=False,
+                      encoding='utf-8-sig')
+    except PermissionError:
+        simple.to_csv(out_dir / 'reversal_simple.new.csv', index=False,
+                      encoding='utf-8-sig')
+        print('WARNING: reversal_simple.csv locked; wrote .new.csv')
 
     lines = []
     add = lines.append
