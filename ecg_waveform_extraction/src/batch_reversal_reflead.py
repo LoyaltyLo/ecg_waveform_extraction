@@ -347,6 +347,7 @@ def main() -> int:
                'poor_P': 'P证据不足'}
     simple = df[['record', 'verdict']].merge(
         base[['record', 'I_P', 'I_QRS', 'I_T']], on='record')
+    simple = simple[['record', 'I_P', 'I_QRS', 'I_T', 'verdict']]
     for c in ('I_P', 'I_QRS', 'I_T'):
         simple[c] = simple[c].map(pol_cn).fillna('—')
     simple['verdict'] = simple['verdict'].map(verd_cn)
