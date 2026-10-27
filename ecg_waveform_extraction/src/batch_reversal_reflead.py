@@ -46,8 +46,8 @@ Outputs (output/reversal_reflead/)
 ----------------------------------
 reversal_by_record.csv : verdict, score, fired rules with values,
     agreement vs the device flag, differential notes (666 rows).
-reversal_simple.csv : quick-read table — record, lead-I P/QRS/T
-    polarity and the verdict, Chinese values, 5 columns total.
+reversal_simple.csv : quick-read table — record, lead-I and aVR
+    P/QRS/T polarity and the verdict, Chinese values, 8 columns.
 plots/<record>.png     : 12-lead figure for every triggered or
     device-flagged record — spans + polarity glyphs as in the polarity
     stage, lead I / aVR highlighted, verdict in the suptitle.
@@ -345,13 +345,15 @@ def main() -> int:
     verd_cn = {'definite': '确证反接', 'probable': '可能反接',
                'suspicious': '可疑反接', 'none': '正常连接',
                'poor_P': 'P证据不足'}
+    wave_cols = [f'{l}_{w}' for l in ('I', 'AVR') for w in ('P', 'QRS', 'T')]
     simple = df[['record', 'verdict']].merge(
-        base[['record', 'I_P', 'I_QRS', 'I_T']], on='record')
-    simple = simple[['record', 'I_P', 'I_QRS', 'I_T', 'verdict']]
-    for c in ('I_P', 'I_QRS', 'I_T'):
+        base[['record'] + wave_cols], on='record')
+    simple = simple[['record'] + wave_cols + ['verdict']]
+    for c in wave_cols:
         simple[c] = simple[c].map(pol_cn).fillna('—')
     simple['verdict'] = simple['verdict'].map(verd_cn)
-    simple.columns = ['记录号', 'P波(I导)', 'QRS波(I导)', 'T波(I导)', '结论']
+    simple.columns = ['记录号', 'P波(I导)', 'QRS波(I导)', 'T波(I导)',
+                      'P波(aVR)', 'QRS波(aVR)', 'T波(aVR)', '结论']
     try:
         simple.to_csv(out_dir / 'reversal_simple.csv', index=False,
                       encoding='utf-8-sig')
