@@ -33,8 +33,10 @@ Verdicts: definite / probable / suspicious / none / poor_P.  definite
 includes the double signature S1 & S2 (user-adjudicated as true even
 when the device missed it).  Evidence score (weights measured on the
 silver standard): I_T neg +2, aVR QRS+T pos +2, I_P neg +1.5,
-aVR_P pos +1.5, per-beat consistency >= 70% +1, device P axis flipped
-or unmeasured +1, P amplitude adequate +0.5.
+aVR_P pos +1.5, per-beat consistency >= 70% +1, P amplitude adequate
++0.5.  No device field feeds the verdict (user directive 2026-10):
+device axes / interpretation are exported only as comparison columns,
+and the device flag is only a reporting yardstick.
 
 Inputs
 ------
@@ -55,19 +57,23 @@ cohort_summary.txt     : verdict counts and device-flag agreement.
 
 Validation (full 666-record run, 2026-10)
 -----------------------------------------
-666-row CSV + 111 figures in ~3 min.  Verdicts: definite 94 /
-probable 9 / suspicious 6 / poor_P 50 / none 507.  Hard signatures:
+666-row CSV + 111 figures in ~3 min.  Verdicts: definite 89 /
+probable 14 / suspicious 1 / poor_P 50 / none 512.  Hard signatures:
 S1 (P axis flip) 98, S2 (lead I inverted) 85, S3 (aVR all-positive)
-25, double S1&S2 76.  vs the device flag (59) as silver standard:
-sensitivity 86.4% (51/59); ours-only 52 of which 26 carry the double
-signature (user-adjudicated true reversals the device missed — its
-reports say "right axis / lateral MI", the classic RA-LA mimic);
+25, double S1&S2 76.  vs the device flag (59) as reporting yardstick
+only: sensitivity 86.4% (51/59); ours-only 52 of which 26 carry the
+double signature (user-adjudicated true reversals the device missed —
+its reports say "right axis / lateral MI", the classic RA-LA mimic);
 device-only 8 = 4 poor-P (P coverage <50%, honestly capped) + 1
 "none" (I_P positive, our P axis -51 deg — device false positive
 suspected) + 3 suspicious.  8 definite/probable carry a
 poor-R-progression (dextrocardia?) note for human review; the
 flagged-59 all have normal R progression.  Figure check: I/aVR red
 frames, spans+glyphs on waves, verdict/P-axis in the suptitle.
+2026-10-27 the device_p_flip evidence item (+1) was removed (user
+directive: no dataset conclusions in the verdict) — 5 definite demoted
+to probable, 5 suspicious to none; the detected set (103), the double
+signatures (76) and every headline number above were unchanged.
 """
 from __future__ import annotations
 
@@ -109,9 +115,10 @@ R_PROG_MARGIN_MV = 0.2    # R_V1 - R_V6 above this -> poor progression
 CHEST_LEADS = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
 # evidence weights (I_T neg measured 98.3%/91.1% on the silver standard,
-# aVR QRS+T pos 33.9%/95.6% — specific; I_P neg 93.2%/87.3%)
+# aVR QRS+T pos 33.9%/95.6% — specific; I_P neg 93.2%/87.3%).
+# Device-derived items are excluded: our measurements only.
 W = {'I_T_neg': 2.0, 'avr_qt_pos': 2.0, 'I_P_neg': 1.5, 'avr_p_pos': 1.5,
-     'consistency': 1.0, 'device_p_flip': 1.0, 'p_amp_good': 0.5}
+     'consistency': 1.0, 'p_amp_good': 0.5}
 
 
 def _signed_amp(g: pd.DataFrame, wave: str) -> np.ndarray:
@@ -170,8 +177,6 @@ def classify(f: dict) -> dict:
         hit('consistency', f['i_p_neg_share'] == f['i_p_neg_share']
             and f['i_p_neg_share'] >= CONSISTENCY_MIN,
             f"{f['i_p_neg_share']:.0%}")
-        dev = f['device_P_axis']
-        hit('device_p_flip', dev == dev and (dev > 90.0 or dev <= 0.0), f'{dev:.0f}deg')
         hit('p_amp_good', f['p_amp_mv'] == f['p_amp_mv'] and f['p_amp_mv'] >= P_AMP_GOOD_MV,
             f"{f['p_amp_mv']:.2f}mV")
     else:  # QRS/T-only branch: weaker set, verdict stays capped
