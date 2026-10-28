@@ -15,7 +15,9 @@ aVR <-> aVL, aVF and the chest leads unchanged.  Observable signatures
       QRS/T but leaves the sinus P axis in 0-90; reversal flips P too
       (theta -> 180 - theta).  Axis needs a reliable P amplitude.
   S2  lead I inverted: P neg + T neg + QRS not positive
-      86.4% / 95.7%
+      86.4% / 95.7% — guarded: if the measured P axis is up-left
+      (215-360 deg, retrograde/ectopic/noise) the P leg is void: a
+      mirrored sinus P cannot land there (RAD/AF mimic guard).
   S3  aVR P/QRS/T all majority-positive — rare but nearly conclusive
       (~29% / ~98%): after the swap aVR shows the old aVL, whose P is
       usually tiny, so S3 firing with a clear P is strong evidence.
@@ -57,11 +59,11 @@ cohort_summary.txt     : verdict counts and device-flag agreement.
 
 Validation (full 666-record run, 2026-10)
 -----------------------------------------
-666-row CSV + 111 figures in ~3 min.  Verdicts: definite 89 /
-probable 14 / suspicious 1 / poor_P 50 / none 512.  Hard signatures:
-S1 (P axis flip) 98, S2 (lead I inverted) 85, S3 (aVR all-positive)
+666-row CSV + 109 figures in ~3 min.  Verdicts: definite 87 /
+probable 14 / suspicious 3 / poor_P 50 / none 512.  Hard signatures:
+S1 (P axis flip) 98, S2 (lead I inverted) 83, S3 (aVR all-positive)
 25, double S1&S2 76.  vs the device flag (59) as reporting yardstick
-only: sensitivity 86.4% (51/59); ours-only 52 of which 26 carry the
+only: sensitivity 86.4% (51/59); ours-only 50 of which 26 carry the
 double signature (user-adjudicated true reversals the device missed —
 its reports say "right axis / lateral MI", the classic RA-LA mimic);
 device-only 8 = 4 poor-P (P coverage <50%, honestly capped) + 1
@@ -72,8 +74,17 @@ flagged-59 all have normal R progression.  Figure check: I/aVR red
 frames, spans+glyphs on waves, verdict/P-axis in the suptitle.
 2026-10-27 the device_p_flip evidence item (+1) was removed (user
 directive: no dataset conclusions in the verdict) — 5 definite demoted
-to probable, 5 suspicious to none; the detected set (103), the double
-signatures (76) and every headline number above were unchanged.
+to probable, 5 suspicious to none; the detected set, the double
+signatures (76) and the headline numbers were unchanged.
+2026-10-28 the RAD/AF mimic guard: a measurable P axis in 215-360 deg
+(up-left = retrograde/ectopic/noise; a mirrored sinus P cannot land
+there) voids S2's P leg.  Two records demoted definite -> suspicious
+with a P_axis_nonsinus note (220316L6F9 is atrial fibrillation — its
+"P" is fibrillatory noise; 2108190POK sinus tach with borderline RAD,
+our P axis 222 vs device 59 deg).  Of the 331 records whose device
+text says "右偏电轴", we call none/poor_P on 297 — the P-axis
+gate is what separates pathologic RAD (QRS/T flip, P stays 0-90)
+from true reversal.
 """
 from __future__ import annotations
 
@@ -108,6 +119,8 @@ P_RATE_MIN_PCT = 50.0     # below: P evidence insufficient (AF, low P)
 P_AMP_FLOOR_MV = 0.03     # below: our P axis is unreliable -> S1 disabled
 P_AMP_GOOD_MV = 0.05      # adequate P amplitude (+0.5 evidence)
 AXIS_FLIP_DEG = (95.0, 215.0)   # P frontal axis window after RA-LA swap
+AXIS_NONSINUS_DEG = (215.0, 360.0)  # up-left P: retrograde/ectopic/noise —
+                                    # a mirrored sinus P cannot land here
 CONSISTENCY_MIN = 0.70    # share of beats with negative P in lead I
 SCORE_DEFINITE = 4.0      # hard signature + this score -> definite
 SCORE_SUSPICIOUS = 5.0    # no hard signature but this much evidence
@@ -156,7 +169,13 @@ def classify(f: dict) -> dict:
     p_gate = f['p_pass_rate_pct'] >= P_RATE_MIN_PCT
     ax_ok = p_gate and f['p_ax_deg'] == f['p_ax_deg'] and f['p_amp_mv'] >= P_AMP_FLOOR_MV
     s1 = bool(ax_ok and AXIS_FLIP_DEG[0] <= f['p_ax_deg'] <= AXIS_FLIP_DEG[1])
-    s2 = (f['I_P'] == 'negative' and f['I_T'] == 'negative'
+    # RAD-mimic guard: the swap mirrors sinus 0-90 deg into 90-180 deg only;
+    # a measurable P axis up-left (215-360 deg) is retrograde/ectopic/noise,
+    # so lead-I P negativity must not count as a reversal signature there.
+    p_nonsinus = ax_ok and (AXIS_NONSINUS_DEG[0] < f['p_ax_deg']
+                            < AXIS_NONSINUS_DEG[1])
+    s2 = (not p_nonsinus
+          and f['I_P'] == 'negative' and f['I_T'] == 'negative'
           and f['I_QRS'] in ('negative', 'biphasic'))
     s3 = (f['AVR_P'] == 'positive' and f['AVR_QRS'] == 'positive'
           and f['AVR_T'] == 'positive')
@@ -207,6 +226,8 @@ def classify(f: dict) -> dict:
         notes.append('P_coverage_low')
     if ax_ok and not s1 and f['I_QRS'] == 'negative' and f['I_T'] == 'negative':
         notes.append('pathologic_RAD(P axis normal)')
+    if p_nonsinus:
+        notes.append('P_axis_nonsinus(retrograde/ectropic?)')
     return {'verdict': verdict, 'score': round(score, 1),
             'S1_P_axis_flip': s1, 'S2_lead_I_inverted': bool(s2),
             'S3_aVR_all_positive': bool(s3), 'fired': '; '.join(fired),
