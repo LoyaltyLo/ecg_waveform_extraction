@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Stage 7: RA-LA (left/right arm) limb-lead reversal detection.
+"""Stage 7: limb-lead reversal detection (RA-LA / RA-LL / LA-LL).
 
 Detects RA-LA reversal per record from the features the earlier stages
 already measured (per-beat per-lead polarity CSV + record overview) —
@@ -21,6 +21,39 @@ aVR <-> aVL, aVF and the chest leads unchanged.  Observable signatures
   S3  aVR P/QRS/T all majority-positive — rare but nearly conclusive
       (~29% / ~98%): after the swap aVR shows the old aVL, whose P is
       usually tiny, so S3 firing with a clear P is strong evidence.
+
+RA-LL (right arm <-> left leg): II -> -II, I -> -III, aVR <-> aVF,
+aVL unchanged.  T1 lead II inverted (mirror triple, S2's shape on II);
+junctional/retrograde P also gives II P neg but keeps II QRS positive
+and aVR QRS negative, so the QRS legs separate the two.  T2 aVR
+all-positive AND aVF QRS negative (aVR shows the old aVF, aVF the old
+aVR — aVF all-positive is the normal sinus pattern, so aVR displaying
+it is the clean RA-LL tell).  Ladder mirrors RA-LA (T1&T2 -> definite);
+under RA-LL lead III shows -I, so U1 firing alongside T1 is EXPECTED
+and corroborates ra_ll rather than contradicting it.
+
+LA-LL (left arm <-> left leg): III -> -III, I <-> II, aVL <-> aVF,
+aVR unchanged.  U1 lead III inverted; U2 aVL P/QRS positive AND aVF
+QRS negative (the aVL/aVF swap).  definite needs U1 & U2 — III
+inversion alone is common in left-axis normals, and LAFB mimics U2's
+aVL+/aVF- without inverting III's P; partial evidence stays
+suspicious.
+
+RA-LL / LA-LL have no silver standard in this dataset (the device
+never reports them), so their verdicts are UNCALIBRATED and held to a
+stricter bar: (1) a verdict requires a hard signature — the soft score
+never fires them alone (lead-III P-/T- with a positive QRS is the
+textbook left-axis variant and would score 5.0 on ~19 otherwise-normal
+records), and (2) every P leg must be per-beat stable (>= 70% of
+P-detected beats) — a bare 57-64% majority reflects atrial bigeminy /
+baseline wander (polarity alternating per beat), not wiring, and two
+such near-fires (1807185Z4A, 2110148P2G) were caught exactly this way.
+
+The three types are physically exclusive; the strongest verdict wins
+(ties: score, then ra_la — the only silver-standard-calibrated type).
+The P-evidence gate, dextrocardia differential and poor_P cap apply
+to all three; the nonsinus-P guard is RA-LA only (the I/aVF axis
+formula is not valid under the other swaps).
 
 Hard gates (score cannot fire without them):
   - P evidence gate: p_pass_rate >= 50% and median |P| in I/aVF above
@@ -48,13 +81,19 @@ raw .aECG XMLs (only for figures of triggered/flagged records)
 
 Outputs (output/reversal_reflead/)
 ----------------------------------
-reversal_by_record.csv : verdict, score, fired rules with values,
-    agreement vs the device flag, differential notes (666 rows).
+reversal_by_record.csv : verdict, reversal_type (ra_la/ra_ll/la_ll),
+    score, signature flags S1-S3 (RA-LA), T1/T2 (RA-LL), U1/U2 (LA-LL),
+    fired rules with values, agreement vs the device flag, differential
+    notes (666 rows).
 reversal_simple.csv : quick-read table — record, lead-I and aVR
-    P/QRS/T polarity and the verdict, Chinese values, 8 columns.
+    P/QRS/T polarity and the verdict, Chinese values, 8 columns;
+    detected verdicts carry the type (确证RA-LA反接 / 确证RA-LL反接 /
+    确证LA-LL反接).  II/III/aVL/aVF polarity for the other two types is
+    in reversal_by_record.csv / record_overview.csv.
 plots/<record>.png     : 12-lead figure for every triggered or
     device-flagged record — spans + polarity glyphs as in the polarity
-    stage, lead I / aVR highlighted, verdict in the suptitle.
+    stage, the active type's leads framed (RA-LA: I/aVR; RA-LL:
+    II/aVR/aVF; LA-LL: III/aVL/aVF), type+verdict in the suptitle.
 cohort_summary.txt     : verdict counts and device-flag agreement.
 
 Validation (full 666-record run, 2026-10)
@@ -85,6 +124,28 @@ our P axis 222 vs device 59 deg).  Of the 331 records whose device
 text says "右偏电轴", we call none/poor_P on 297 — the P-axis
 gate is what separates pathologic RAD (QRS/T flip, P stays 0-90)
 from true reversal.
+2026-11-04 the three-type extension (RA-LL / LA-LL, no silver
+standard exists for them in this dataset).  The RA-LA result is
+bit-identical: definite 87 / probable 14 / suspicious-3 preserved,
+detected set (101) unchanged.  RA-LL/LA-LL detections: 0 — the
+strict bar (hard signature + >=70% per-beat P stability) killed both
+near-fires that a first pass had called definite: 1807185Z4A (II/III
+mirror triples but lead-II P only 4/7 beats negative, 0.07 mV) and
+2110148P2G (per-beat P polarity ALTERNATES across all limb leads with
+0.15-0.4 mV amplitudes on both signs — atrial bigeminy / baseline
+wander, device gave no interpretation at all; it stays definite ra_la
+via the silver-calibrated S3 ladder).  Survivors: 4x T1 and 1x T2,
+all on records already definite ra_la (multi_type note — under RA-LA
+lead II shows the old III, so T1 fires on right-axis RA-LA subjects);
+4x U1 + 1x U2 with 3 la_ll suspicious partials (III inverted with
+stable P) and 210316Y21L suspicious/LA-LL_P_unstable — full U1+U2
+legs, per-beat aVL/III amplitude mirroring (0.49/0.51, 1.19/1.16 mV)
+and normal R progression say true LA-LL on a +90-axis subject, but
+lead-III P is 4/6 beats negative = 67% < 70%, so definite was not
+defensible.  2012238UMB (U1&U2 both) honestly capped poor_P (P
+coverage 45%).  The first pass also showed why score-only firing is
+disabled for uncalibrated types: 19 normal left-axis variants score
+exactly 5.0 on III P-/T- + consistency + amplitude.
 """
 from __future__ import annotations
 
@@ -132,6 +193,15 @@ CHEST_LEADS = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 # Device-derived items are excluded: our measurements only.
 W = {'I_T_neg': 2.0, 'avr_qt_pos': 2.0, 'I_P_neg': 1.5, 'avr_p_pos': 1.5,
      'consistency': 1.0, 'p_amp_good': 0.5}
+# RA-LL / LA-LL: no silver standard on this dataset — weights mirror
+# the RA-LA calibration with the leads substituted per type
+W_RA_LL = {'II_T_neg': 2.0, 'II_P_neg': 1.5, 'avr_all_pos': 2.0,
+           'avf_q_neg': 1.5, 'ii_consistency': 1.0, 'p_amp_good': 0.5}
+W_LA_LL = {'III_T_neg': 2.0, 'III_P_neg': 1.5, 'avl_pq_pos': 1.5,
+           'avf_q_neg': 1.5, 'iii_consistency': 1.0, 'p_amp_good': 0.5}
+# leads framed red in figures, per detected type
+FRAME_LEADS = {'ra_la': ('I', 'AVR'), 'ra_ll': ('II', 'AVR', 'AVF'),
+               'la_ll': ('III', 'AVL', 'AVF')}
 
 
 def _signed_amp(g: pd.DataFrame, wave: str) -> np.ndarray:
@@ -153,11 +223,20 @@ def record_features(pol: pd.DataFrame) -> dict:
         and (a_i or a_avf) else np.nan
     neg = (gi['P_polarity'] == 'negative').mean() if len(gi) else np.nan
 
+    def p_share(lead, value):
+        gl = pw[pw['lead'] == lead]
+        s = (gl['P_polarity'] == value).mean() if len(gl) else np.nan
+        return float(s) if s == s else np.nan
+
     qw = pol[pol['QRS_on_ms'].notna()]
     r_amp = {l: (float(np.median(_signed_amp(qw[qw['lead'] == l], 'QRS')))
                  if len(qw[qw['lead'] == l]) else np.nan) for l in CHEST_LEADS}
     out.update(p_ax_deg=ax, p_amp_i_mv=a_i, p_amp_avf_mv=a_avf,
                i_p_neg_share=float(neg) if neg == neg else np.nan,
+               ii_p_neg_share=p_share('II', 'negative'),
+               iii_p_neg_share=p_share('III', 'negative'),
+               avr_p_pos_share=p_share('AVR', 'positive'),
+               avl_p_pos_share=p_share('AVL', 'positive'),
                r_v1_mv=r_amp['V1'], r_v6_mv=r_amp['V6'])
     amps = [abs(a) for a in (a_i, a_avf) if a == a]
     out['p_amp_mv'] = max(amps) if amps else np.nan
@@ -165,58 +244,147 @@ def record_features(pol: pd.DataFrame) -> dict:
 
 
 def classify(f: dict) -> dict:
-    """Verdict + score from one record's feature dict."""
+    """Verdict + reversal type + score from one record's feature dict.
+
+    Three physically exclusive arm swaps, each with its own hard
+    signatures; the strongest verdict wins (ties: score, then ra_la —
+    the only type calibrated against a silver standard).
+    """
     p_gate = f['p_pass_rate_pct'] >= P_RATE_MIN_PCT
     ax_ok = p_gate and f['p_ax_deg'] == f['p_ax_deg'] and f['p_amp_mv'] >= P_AMP_FLOOR_MV
+
+    def inverted(lead):  # mirror triple: P neg + T neg + QRS not positive
+        return (f[f'{lead}_P'] == 'negative' and f[f'{lead}_T'] == 'negative'
+                and f[f'{lead}_QRS'] in ('negative', 'biphasic'))
+
+    # ---- RA-LA: I -> -I, II <-> III, aVR <-> aVL, aVF unchanged ----
     s1 = bool(ax_ok and AXIS_FLIP_DEG[0] <= f['p_ax_deg'] <= AXIS_FLIP_DEG[1])
     # RAD-mimic guard: the swap mirrors sinus 0-90 deg into 90-180 deg only;
     # a measurable P axis up-left (215-360 deg) is retrograde/ectopic/noise,
     # so lead-I P negativity must not count as a reversal signature there.
     p_nonsinus = ax_ok and (AXIS_NONSINUS_DEG[0] < f['p_ax_deg']
                             < AXIS_NONSINUS_DEG[1])
-    s2 = (not p_nonsinus
-          and f['I_P'] == 'negative' and f['I_T'] == 'negative'
-          and f['I_QRS'] in ('negative', 'biphasic'))
-    s3 = (f['AVR_P'] == 'positive' and f['AVR_QRS'] == 'positive'
-          and f['AVR_T'] == 'positive')
+    s2 = (not p_nonsinus) and inverted('I')
+    avr_all_pos = (f['AVR_P'] == 'positive' and f['AVR_QRS'] == 'positive'
+                   and f['AVR_T'] == 'positive')
 
-    fired, score = [], 0.0
-    def hit(name, cond, val):
-        nonlocal score
-        if cond:
-            score += W[name]
-            fired.append(f'{name}={val}')
+    # ---- RA-LL: II -> -II, aVR <-> aVF, aVL unchanged ----
+    # junctional/retrograde P also gives II P neg + aVR P pos, but keeps
+    # II QRS positive and aVR QRS negative — the QRS legs separate them.
+    # P legs additionally need >=70% per-beat stability: without a silver
+    # standard a 57-64% bare majority must not carry a hard signature
+    # (atrial bigeminy / baseline wander alternates P polarity per beat).
+    # Full-leg raw signatures whose P legs fail stability downgrade to
+    # suspicious (the QRS legs are amplitude-robust; a human reviews).
+    def _stable(share):
+        return share == share and share >= CONSISTENCY_MIN
 
-    if p_gate:
-        hit('I_T_neg', f['I_T'] == 'negative', f['I_T'])
-        hit('I_P_neg', f['I_P'] == 'negative', f['I_P'])
-        hit('avr_p_pos', f['AVR_P'] == 'positive', f['AVR_P'])
-        hit('avr_qt_pos', f['AVR_QRS'] == 'positive' and f['AVR_T'] == 'positive',
-            f"{f['AVR_QRS']}/{f['AVR_T']}")
-        hit('consistency', f['i_p_neg_share'] == f['i_p_neg_share']
-            and f['i_p_neg_share'] >= CONSISTENCY_MIN,
-            f"{f['i_p_neg_share']:.0%}")
-        hit('p_amp_good', f['p_amp_mv'] == f['p_amp_mv'] and f['p_amp_mv'] >= P_AMP_GOOD_MV,
-            f"{f['p_amp_mv']:.2f}mV")
-    else:  # QRS/T-only branch: weaker set, verdict stays capped
-        hit('I_T_neg', f['I_T'] == 'negative', f['I_T'])
-        hit('avr_qt_pos', f['AVR_QRS'] == 'positive' and f['AVR_T'] == 'positive',
-            f"{f['AVR_QRS']}/{f['AVR_T']}")
+    t1_raw = inverted('II')
+    t2_raw = avr_all_pos and f['AVF_QRS'] == 'negative'
+    t1 = t1_raw and _stable(f['ii_p_neg_share'])
+    t2 = (t2_raw and _stable(f['avr_p_pos_share']))
 
-    hard = (s1 or s2 or s3) and p_gate
-    double = s1 and s2
-    if double:
-        verdict = 'definite'
-    elif hard and score >= SCORE_DEFINITE:
-        verdict = 'definite'
-    elif hard:
-        verdict = 'probable'
-    elif p_gate and score >= SCORE_SUSPICIOUS:
-        verdict = 'suspicious'
-    elif p_gate:
-        verdict = 'none'
+    # ---- LA-LL: III -> -III, aVL <-> aVF, aVR unchanged, I <-> II ----
+    # LAFB mimics U2's aVL+/aVF- but never inverts III's P.
+    u1_raw = inverted('III')
+    u2_raw = (f['AVL_P'] == 'positive' and f['AVL_QRS'] == 'positive'
+              and f['AVF_QRS'] == 'negative')
+    u1 = u1_raw and _stable(f['iii_p_neg_share'])
+    u2 = u2_raw and _stable(f['avl_p_pos_share'])
+
+    def _score(weights, items):
+        fired_l, sc = [], 0.0
+        for name, cond, val in items:
+            if cond:
+                sc += weights[name]
+                fired_l.append(f'{name}={val}')
+        return sc, fired_l
+
+    amp_ok = f['p_amp_mv'] == f['p_amp_mv'] and f['p_amp_mv'] >= P_AMP_GOOD_MV
+    ii_share, iii_share = f['ii_p_neg_share'], f['iii_p_neg_share']
+    ra_items = ([
+        ('I_T_neg', f['I_T'] == 'negative', f['I_T']),
+        ('I_P_neg', f['I_P'] == 'negative', f['I_P']),
+        ('avr_p_pos', f['AVR_P'] == 'positive', f['AVR_P']),
+        ('avr_qt_pos', f['AVR_QRS'] == 'positive' and f['AVR_T'] == 'positive',
+         f"{f['AVR_QRS']}/{f['AVR_T']}"),
+        ('consistency', f['i_p_neg_share'] == f['i_p_neg_share']
+         and f['i_p_neg_share'] >= CONSISTENCY_MIN,
+         f"{f['i_p_neg_share']:.0%}"),
+        ('p_amp_good', amp_ok, f"{f['p_amp_mv']:.2f}mV"),
+    ] if p_gate else [  # QRS/T-only branch: weaker set, verdict stays capped
+        ('I_T_neg', f['I_T'] == 'negative', f['I_T']),
+        ('avr_qt_pos', f['AVR_QRS'] == 'positive' and f['AVR_T'] == 'positive',
+         f"{f['AVR_QRS']}/{f['AVR_T']}"),
+    ])
+    rall_items = [
+        ('II_T_neg', f['II_T'] == 'negative', f['II_T']),
+        ('II_P_neg', f['II_P'] == 'negative', f['II_P']),
+        ('avr_all_pos', avr_all_pos, 'aVR'),
+        ('avf_q_neg', f['AVF_QRS'] == 'negative', f['AVF_QRS']),
+        ('ii_consistency', ii_share == ii_share and ii_share >= CONSISTENCY_MIN,
+         f"{ii_share:.0%}"),
+        ('p_amp_good', amp_ok, f"{f['p_amp_mv']:.2f}mV"),
+    ]
+    lall_items = [
+        ('III_T_neg', f['III_T'] == 'negative', f['III_T']),
+        ('III_P_neg', f['III_P'] == 'negative', f['III_P']),
+        ('avl_pq_pos', f['AVL_P'] == 'positive' and f['AVL_QRS'] == 'positive',
+         f"{f['AVL_P']}/{f['AVL_QRS']}"),
+        ('avf_q_neg', f['AVF_QRS'] == 'negative', f['AVF_QRS']),
+        ('iii_consistency', iii_share == iii_share
+         and iii_share >= CONSISTENCY_MIN, f"{iii_share:.0%}"),
+        ('p_amp_good', amp_ok, f"{f['p_amp_mv']:.2f}mV"),
+    ]
+    sc_ra, fired_ra = _score(W, ra_items)
+    sc_rall, fired_rall = _score(W_RA_LL, rall_items)
+    sc_lall, fired_lall = _score(W_LA_LL, lall_items)
+
+    def _ladder(hard, double, sc):
+        if double:
+            return 'definite'
+        if hard and sc >= SCORE_DEFINITE:
+            return 'definite'
+        if hard:
+            return 'probable'
+        return 'suspicious' if sc >= SCORE_SUSPICIOUS else 'none'
+
+    v_ra = _ladder(s1 or s2 or avr_all_pos, s1 and s2, sc_ra)
+    # RA-LL / LA-LL are uncalibrated (no device-flagged cases in the
+    # dataset): a verdict requires a HARD signature — score alone never
+    # fires.  Lead-III P-/T- with a POSITIVE QRS is the textbook normal
+    # left-axis variant (~19 records score 5.0 on it); calling those
+    # "suspicious LA-LL" would be noise, not evidence.
+    if t1 or t2:
+        v_rall = _ladder(True, t1 and t2, sc_rall)
+    elif t1_raw and t2_raw:  # full legs, P unstable -> human review
+        v_rall = 'suspicious'
     else:
-        verdict = 'poor_P'
+        v_rall = 'none'
+    # LA-LL: definite only on the full pair — III inversion alone is a
+    # common left-axis/LAFB variant, so partial evidence stays suspicious
+    if u1 and u2:
+        v_lall = 'definite'
+    elif u1 or (u1_raw and u2_raw):  # full legs, P unstable -> review
+        v_lall = 'suspicious'
+    else:
+        v_lall = 'none'
+
+    if not p_gate:
+        verdict, rev_type = 'poor_P', ''
+        fired_str, best_sc = '; '.join(fired_ra), sc_ra
+    else:
+        rank = {'none': 0, 'suspicious': 1, 'probable': 2, 'definite': 3}
+        cands = [('ra_la', v_ra, sc_ra, fired_ra),
+                 ('ra_ll', v_rall, sc_rall, fired_rall),
+                 ('la_ll', v_lall, sc_lall, fired_lall)]
+        rev_type, verdict, best_sc, fired_best = max(
+            cands, key=lambda c: (rank[c[1]], c[2]))
+        fired_str = '; '.join(fired_best)
+        if rev_type != 'ra_la':
+            fired_str = f'[{rev_type}] ' + fired_str
+        if verdict == 'none':
+            rev_type = ''
 
     notes = []
     if f['r_v1_mv'] == f['r_v1_mv'] and f['r_v6_mv'] == f['r_v6_mv'] \
@@ -227,11 +395,26 @@ def classify(f: dict) -> dict:
     if ax_ok and not s1 and f['I_QRS'] == 'negative' and f['I_T'] == 'negative':
         notes.append('pathologic_RAD(P axis normal)')
     if p_nonsinus:
-        notes.append('P_axis_nonsinus(retrograde/ectropic?)')
-    return {'verdict': verdict, 'score': round(score, 1),
+        notes.append('P_axis_nonsinus(retrograde/ectopic?)')
+    hard_types = [t for t, h in (('ra_la', s1 or s2 or avr_all_pos),
+                                 ('ra_ll', t1 or t2), ('la_ll', u1 or u2)) if h]
+    if len(hard_types) > 1:
+        notes.append('multi_type(' + '+'.join(hard_types) + ')')
+    if t1 != t2:
+        notes.append('RA-LL_partial')
+    if u1 != u2:
+        notes.append('LA-LL_partial')
+    if (t1_raw and t2_raw) and not (t1 and t2):
+        notes.append('RA-LL_P_unstable')
+    if (u1_raw and u2_raw) and not (u1 and u2):
+        notes.append('LA-LL_P_unstable')
+    return {'verdict': verdict, 'reversal_type': rev_type,
+            'score': round(best_sc, 1),
             'S1_P_axis_flip': s1, 'S2_lead_I_inverted': bool(s2),
-            'S3_aVR_all_positive': bool(s3), 'fired': '; '.join(fired),
-            'notes': '; '.join(notes)}
+            'S3_aVR_all_positive': bool(avr_all_pos),
+            'T1_II_inverted': bool(t1), 'T2_aVR_aVF_swap': bool(t2),
+            'U1_III_inverted': bool(u1), 'U2_aVL_aVF_swap': bool(u2),
+            'fired': fired_str, 'notes': '; '.join(notes)}
 
 
 def plot_record(fname: str, data_dir: str, pol: pd.DataFrame, f: dict,
@@ -247,10 +430,13 @@ def plot_record(fname: str, data_dir: str, pol: pd.DataFrame, f: dict,
              .drop_duplicates()
              for w in ('P', 'QRS', 'T')}
     fig, axes = plt.subplots(4, 3, figsize=(16, 9))
+    rtype = (f.get('reversal_type') or 'ra_la').replace('_', '-').upper()
     fig.suptitle(
-        f"{rec['filename']}  |  RA-LA reversal: {f['verdict'].upper()}  "
+        f"{rec['filename']}  |  {rtype} reversal: {f['verdict'].upper()}  "
         f"(score {f['score']}, S1={f['S1_P_axis_flip']} S2={f['S2_lead_I_inverted']} "
-        f"S3={f['S3_aVR_all_positive']})\n"
+        f"S3={f['S3_aVR_all_positive']} T1={f.get('T1_II_inverted')} "
+        f"T2={f.get('T2_aVR_aVF_swap')} U1={f.get('U1_III_inverted')} "
+        f"U2={f.get('U2_aVL_aVF_swap')})\n"
         f"P axis ours {f['p_ax_deg']:.0f} deg (flip window {AXIS_FLIP_DEG[0]:.0f}-"
         f"{AXIS_FLIP_DEG[1]:.0f}) | device P/QRS/T axis "
         f"{f['device_P_axis']:.0f}/{f['device_QRS_axis']:.0f}/{f['device_T_axis']:.0f} | "
@@ -290,7 +476,8 @@ def plot_record(fname: str, data_dir: str, pol: pd.DataFrame, f: dict,
             maj = ''.join(f.get(f'{lead}_{w}', '?')[0] if f.get(f'{lead}_{w}') else '?'
                           for w in ('P', 'QRS', 'T'))
             ax.set_title(f"{lead}  {maj}", fontsize=10, fontweight='bold', loc='left')
-            if lead in ('I', 'AVR'):  # the reversal leads, visually framed
+            if lead in FRAME_LEADS.get(f.get('reversal_type') or 'ra_la', FRAME_LEADS['ra_la']):
+                # this type's reversal leads, visually framed
                 for sp in ax.spines.values():
                     sp.set_edgecolor('#d32f2f')
                     sp.set_linewidth(2.0)
@@ -342,8 +529,10 @@ def main() -> int:
         f['device_flag'] = DEVICE_FLAG_PHRASE in str(r['interpretation'])
         f.update(classify(f))
         rows.append({k: f[k] for k in (
-            'record', 'verdict', 'score', 'S1_P_axis_flip', 'S2_lead_I_inverted',
-            'S3_aVR_all_positive', 'fired', 'notes', 'p_ax_deg', 'p_amp_mv',
+            'record', 'verdict', 'reversal_type', 'score',
+            'S1_P_axis_flip', 'S2_lead_I_inverted', 'S3_aVR_all_positive',
+            'T1_II_inverted', 'T2_aVR_aVF_swap', 'U1_III_inverted',
+            'U2_aVL_aVF_swap', 'fired', 'notes', 'p_ax_deg', 'p_amp_mv',
             'i_p_neg_share', 'r_v1_mv', 'r_v6_mv', 'p_pass_rate_pct',
             'device_P_axis', 'device_flag', 'interpretation')})
     df = pd.DataFrame(rows)
@@ -372,12 +561,17 @@ def main() -> int:
                'suspicious': '可疑反接', 'none': '正常连接',
                'poor_P': 'P证据不足'}
     wave_cols = [f'{l}_{w}' for l in ('I', 'AVR') for w in ('P', 'QRS', 'T')]
-    simple = df[['record', 'verdict']].merge(
+    simple = df[['record', 'verdict', 'reversal_type']].merge(
         base[['record'] + wave_cols], on='record')
-    simple = simple[['record'] + wave_cols + ['verdict']]
     for c in wave_cols:
         simple[c] = simple[c].map(pol_cn).fillna('—')
-    simple['verdict'] = simple['verdict'].map(verd_cn)
+    type_cn = {'ra_la': 'RA-LA', 'ra_ll': 'RA-LL', 'la_ll': 'LA-LL'}
+    pre_cn = {'definite': '确证', 'probable': '可能', 'suspicious': '可疑'}
+    simple['verdict'] = [
+        pre_cn[v] + type_cn.get(str(t), '') + '反接' if v in pre_cn
+        else verd_cn[v]
+        for v, t in zip(simple['verdict'], simple['reversal_type'].fillna(''))]
+    simple = simple[['record'] + wave_cols + ['verdict']]
     simple.columns = ['记录号', 'P波(I导)', 'QRS波(I导)', 'T波(I导)',
                       'P波(aVR)', 'QRS波(aVR)', 'T波(aVR)', '结论']
     try:
@@ -396,7 +590,14 @@ def main() -> int:
     add(f"hard signatures: S1 {int(df['S1_P_axis_flip'].sum())}, "
         f"S2 {int(df['S2_lead_I_inverted'].sum())}, "
         f"S3 {int(df['S3_aVR_all_positive'].sum())}, "
-        f"double(S1&S2) {int(df['double_signature'].sum())}")
+        f"double(S1&S2) {int(df['double_signature'].sum())}, "
+        f"T1 {int(df['T1_II_inverted'].sum())}, "
+        f"T2 {int(df['T2_aVR_aVF_swap'].sum())}, "
+        f"U1 {int(df['U1_III_inverted'].sum())}, "
+        f"U2 {int(df['U2_aVL_aVF_swap'].sum())}")
+    add("reversal types among detected: "
+        + df.loc[detected, 'reversal_type'].value_counts().to_string()
+        .replace('\n', '  '))
     add("agreement vs device flag: " + df['agreement'].value_counts().to_string()
         .replace('\n', '  '))
     flag = df['device_flag']
