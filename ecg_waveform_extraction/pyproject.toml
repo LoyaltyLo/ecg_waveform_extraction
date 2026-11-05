@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ecg-waveform-extraction"
+version = "1.0.0"
+description = "Library-driven 12-lead aECG delineation and limb-lead reversal detection pipeline (sleepecg / wavedet / prominence-delineator / neurokit2)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "matplotlib>=3.7",
+    "wfdb>=4.1",
+    "openpyxl>=3.1",
+    "prominence-delineator>=0.0.10",
+    "wavedet>=0.1.0",
+    "sleepecg>=0.5.9",
+    "neurokit2>=0.2.13",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.4"]
+
+[project.scripts]
+ecg-pipeline = "ecg_waveform_extraction.src.api:cli"
+
+# The git repo root IS the import package `ecg_waveform_extraction`
+# (imports run from the parent dir).  Map the import name onto "." so
+# the wheel ships only the real code packages listed below — output/,
+# docs/, .git etc. are not packages and stay out.
+[tool.setuptools]
+package-dir = {"ecg_waveform_extraction" = "."}
+packages = [
+    "ecg_waveform_extraction",
+    "ecg_waveform_extraction.src",
+    "ecg_waveform_extraction.src.utils",
+    "ecg_waveform_extraction.src.delineation",
+    "ecg_waveform_extraction.src.preprocessing",
+    "ecg_waveform_extraction.src.features",
+    "ecg_waveform_extraction.src.hsmm",
+    "ecg_waveform_extraction.src.extraction",
+    "ecg_waveform_extraction.src.segmentation",
+]

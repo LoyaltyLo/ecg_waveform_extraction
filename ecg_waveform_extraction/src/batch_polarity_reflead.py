@@ -417,7 +417,7 @@ def process_record(rec: dict, beats: pd.DataFrame, out_png: str,
     return rows, row
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         description='Per-lead per-beat polarity for P/QRS/T on propagated windows')
     ap.add_argument('--data-dir', default=DEFAULT_DATA_DIR)
@@ -427,7 +427,7 @@ def main():
     ap.add_argument('--q-dir', default=DEFAULT_Q_DIR)
     ap.add_argument('--limit', type=int, default=None)
     ap.add_argument('--records', default=None)
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     p_all = pd.read_csv(os.path.join(args.p_dir, 'p_by_beat.csv'))
     t_all = pd.read_csv(os.path.join(args.t_dir, 't_by_beat.csv'))

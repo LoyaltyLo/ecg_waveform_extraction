@@ -319,7 +319,7 @@ def process_record(rec: dict, prep: ECGPreprocessor, stage: WaveletStage,
     return beat_rows, row
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         description='wavedet QRS windows anchored to reference-lead PT R peaks')
     ap.add_argument('--data-dir', default=DEFAULT_DATA_DIR)
@@ -327,7 +327,7 @@ def main():
     ap.add_argument('--limit', type=int, default=None, help='process only first N files')
     ap.add_argument('--records', default=None,
                     help='comma-separated record names (smoke test, e.g. 2203243H09,...)')
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     plots_dir = os.path.join(args.out_dir, 'plots')
     per_lead_base = os.path.join(args.out_dir, 'plots_per_lead')

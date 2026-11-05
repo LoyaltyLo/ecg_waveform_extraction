@@ -423,7 +423,7 @@ def process_record(rec: dict, t_rows: pd.DataFrame, prep: ECGPreprocessor,
     return beat_rows, row
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         description='P-wave delineation in the TP segment (pooled libraries + SNR gate)')
     ap.add_argument('--data-dir', default=DEFAULT_DATA_DIR)
@@ -433,7 +433,7 @@ def main():
     ap.add_argument('--limit', type=int, default=None, help='process only first N files')
     ap.add_argument('--records', default=None,
                     help='comma-separated record names (smoke test)')
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     # upstream anchors: T-stage per-beat table + per-record reference lead
     t_all = pd.read_csv(os.path.join(args.t_stage_dir, 't_by_beat.csv'))

@@ -195,12 +195,12 @@ def process_record(rec: dict, out_png: str, per_lead_dir: str) -> tuple[list[dic
     return sqi_rows, row
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description='SQI reference-lead selection + Pan-Tompkins')
     ap.add_argument('--data-dir', default=DEFAULT_DATA_DIR)
     ap.add_argument('--out-dir', default=DEFAULT_OUT_DIR)
     ap.add_argument('--limit', type=int, default=None, help='process only first N files (smoke test)')
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     plots_dir = os.path.join(args.out_dir, 'plots')
     per_lead_base = os.path.join(args.out_dir, 'plots_per_lead')

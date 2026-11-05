@@ -491,7 +491,7 @@ def plot_record(fname: str, data_dir: str, pol: pd.DataFrame, f: dict,
     plt.close(fig)
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--data-dir', default=DEFAULT_DATA_DIR)
     ap.add_argument('--pol-dir', default=DEFAULT_POL)
@@ -500,7 +500,7 @@ def main() -> int:
     ap.add_argument('--records', default=None,
                     help='comma-separated record filter (debug)')
     ap.add_argument('--no-plots', action='store_true')
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     t0 = time.time()
     pol_all = pd.read_csv(os.path.join(args.pol_dir, 'polarity_by_beat_lead.csv'),
